@@ -146,6 +146,15 @@ class Node:
                 nodes.extend(res)
         return nodes
 
+    def set_role(self, string, role):
+        if self.word.strip().lower() == string.strip().lower() or\
+                self.word.strip().lower() == 'the ' + string.strip().lower():
+            self.role = role
+            return True
+        for child in self.children:
+            child.set_role(string, role)
+        return False
+
     def find(self, string):
         nodes = []
         if self.word.strip().lower() == string.strip().lower() or self.word.strip().lower() == 'the ' + string.strip().lower():
@@ -263,7 +272,7 @@ class Node:
 
     def __repr__(self):
         representation = ""
-        representation += str(self.nodeType)
+        representation += str(self.nodeType) + "{" + self.role + "}"
         if len(self.children) > 0:
             representation += "("
             for child in self.children:
@@ -306,7 +315,6 @@ class ParseTree:
     def resolve_intent(self, sentence, intent):
         return self.root.resolve_intent(sentence, intent)
 
-
     def find(self, string):
         nodes = self.root.find(string) #simple find
         if nodes is None or len(nodes) == 0:
@@ -321,6 +329,9 @@ class ParseTree:
                 return fuzzy_result
             return fuzzy_result
         return nodes
+
+    def set_role(self, string, role):
+        return self.root.set_role(string, role)
 
     def get_leaves(self):
         return self.root.get_leaves()
@@ -344,6 +355,9 @@ class ParseTree:
 
     def get_adjectives(self):
         return self.root.iterate_adjectives()
+
+    def __repr__(self):
+        return self.root.__repr__()
 
 
 def is_inside(string, list):
@@ -370,10 +384,10 @@ class GeoAnalyticalQuestion:
         self.question = question.replace('\'s', '').replace('-', '')
         self.title = title
         self.parser = ''
+        self.sentence = Sentence(self.question, self.source, self.q_type)
 
     def analyze(self):
-        s = Sentence(self.question, self.source, self.q_type)
-        self.parser = s.analyze()
+        self.parser = self.sentence.analyze()
         return self.parser
 
 
@@ -382,6 +396,7 @@ class Sentence():
         self.sentence = sentence
         self.source = source
         self.s_type = s_type
+        self.parse_tree = None
 
     @staticmethod
     def is_ambiguous(intent_list, intent_code):
@@ -406,25 +421,6 @@ class Sentence():
             for l in list_nodes:
                 resolved_intent_list.append({'tag': l.role, 'value': l.word})
                 resolved_intent_code += l.role
-        # OLD WORKING CODE
-        # for elem in desc_list_info:
-        #     if elem['tag'] in ['o', 't']:
-        #         if not flag:
-        #             val = elem['tag']
-        #             flag = True
-        #         if elem['tag'] == val:
-        #             resolved_intent_code += val
-        #             resolved_intent_list.append({'tag': elem['tag'], 'value': elem['value']})
-        #
-        #     elif elem['tag'] in ['q', 'p']:
-        #         if flag:
-        #             break
-        #         else:
-        #             resolved_intent_code += elem['tag']
-        #             resolved_intent_list.append({'tag': elem['tag'], 'value': elem['value']})
-        #
-        #     elif resolved_intent_code != '':
-        #         break;
         result = {'list': resolved_intent_list, 'code': resolved_intent_code}
         return result
 
@@ -463,6 +459,7 @@ class Sentence():
             else:
                 for n in nodes:
                     n.role = 'n'
+                    parse_tree.set_role(n.word, 'n')
                     topo_nodes.add(n)
         for t_node in topo_nodes:
             logging.debug('\t**Found Node: {} and index {}'.format(t_node.word, t_node.index))
@@ -477,6 +474,7 @@ class Sentence():
             else:
                 for n in nodes:
                     n.role = 'd'
+                    parse_tree.set_role(n.word, 'd')
                     dates_nodes.add(n)
 
         for d_node in dates_nodes:
@@ -488,6 +486,7 @@ class Sentence():
         whs = []
         for wh_node in whs_nodes:
             wh_node.role = intent_encoding(wh_node, PRONOUN)
+            parse_tree.set_role(wh_node.word, wh_node.role)
             whs.append(wh_node.word)
 
         if whs is None or len(whs) == 0:
@@ -495,6 +494,7 @@ class Sentence():
                 wh_node = parse_tree.find(parse_tree.root.word.split()[0])
                 if wh_node is not None and len(wh_node) > 0:
                     wh_node[0].role = '8'
+                    parse_tree.set_role(wh_node[0].word, '8')
                     whs_nodes.append(wh_node[0])
         for w in whs:
             logging.info('intent is: {}'.format(w))
@@ -515,15 +515,18 @@ class Sentence():
                                                                                         pt_dict.keys()):
                         a_types.append(n.word)
                         n.role = 't'
+                        parse_tree.set_role(n.word, n.role)
                         a_types_nodes.add(n)
                     elif ' ' not in n.word.strip() and len(n.word) > 2:
                         if n.word.strip().lower() in countries:
                             topo_nodes.add(n)
                             n.role = 'n'
+                            parse_tree.set_role(n.word, n.role)
                             toponyms.append(n.word)
                         else:
                             a_entities_set.add(n.word)
                             n.role = 'o'
+                            parse_tree.set_role(n.word, n.role)
                             a_entities_nodes.add(n)
         for t in a_types:
             logging.debug('\ttype in intent:\t{}'.format(t))
@@ -548,15 +551,18 @@ class Sentence():
                                                                                     pt_dict.keys()):
                     types.append(n.word)
                     n.role = 't'
+                    parse_tree.set_role(n.word, n.role)
                     types_nodes.add(n)
                 elif ' ' not in n.word.strip() and len(n.word) >= 2:
                     if n.word.strip().lower() in countries:
                         topo_nodes.add(n)
                         n.role = 'n'
+                        parse_tree.set_role(n.word, n.role)
                         toponyms.append(n.word)
                     else:
                         entities_set.add(n.word)
                         n.role = 'o'
+                        parse_tree.set_role(n.word, n.role)
                         entities_nodes.add(n)
         for t in types:
             logging.debug('\ttype:\t{}'.format(t))
@@ -584,10 +590,12 @@ class Sentence():
                 if decision == "a":
                     activities.append(v.word)
                     v.role = 'a'
+                    parse_tree.set_role(n.word, n.role)
                     activities_nodes.add(v)
                 elif decision == "s":
                     situations.append(v.word)
                     v.role = 's'
+                    parse_tree.set_role(n.word, n.role)
                     situations_nodes.add(v)
                 else:
                     unknowns.append(v.word)
@@ -615,12 +623,14 @@ class Sentence():
                         if in_pp is not None:
                             relations.append(in_pp.word)
                             in_pp.role = 'r'
+                            parse_tree.set_role(in_pp.word, in_pp.role)
                             relation_nodes.add(in_pp)
                 if n in pp.word and not is_inside_right(pp.word, entities) and not is_inside_right(pp.word, a_entities):
                     in_pp = pp.get_in_in_pp()
                     if in_pp is not None:
                         relations.append(in_pp.word)
                         in_pp.role = 'r'
+                        parse_tree.set_role(in_pp.word, in_pp.role)
                         relation_nodes.add(in_pp)
                         break
             for t in types:
@@ -629,6 +639,7 @@ class Sentence():
                     if in_pp is not None:
                         relations.append(in_pp.word)
                         in_pp.role = 'r'
+                        parse_tree.set_role(in_pp.word, in_pp.role)
                         relation_nodes.add(in_pp)
                         break
         all_nodes = all_nodes.union(relation_nodes)
@@ -649,16 +660,19 @@ class Sentence():
                     if not is_inside(adj.word, types) and not is_inside(adj.word, a_types):
                         qualities.append(adj.word)
                         adj.role = 'q'
+                        parse_tree.set_role(adj.word, adj.role)
                         qualities_nodes.add(adj)
                         break
                 elif is_inside(sibling.word, entities) or is_inside(sibling.word, a_entities):
                     object_qualities.append(adj.word)
                     adj.role = 'p'
+                    parse_tree.set_role(adj.word, adj.role)
                     object_qualities_nodes.add(adj)
                     break
             if adj.role == '' and not is_inside(adj.word, toponyms) and not is_inside(adj.word, dates):
                 object_qualities.append(adj.word)
                 adj.role = 'p'
+                parse_tree.set_role(adj.word, adj.role)
                 object_qualities_nodes.add(adj)
 
         all_nodes = all_nodes.union(qualities_nodes)
@@ -785,6 +799,7 @@ class Sentence():
         logging.info('\tdesc code is: {}'.format(desc_code))
         logging.info('\tall code is: {}'.format(all_code))
         logging.info('*******************************************************')
+        self.parse_tree = parse_tree
         return result_dict
 
 
@@ -972,21 +987,24 @@ def analyze(questions, dataset_name):
     results = []
     count = 0
     for question in questions:
-        try:
-            count += 1
-            result = {}
-            result['question'] = question.question
-            result['id'] = question.id
-            result['source'] = question.source
-            result['title'] = question.title
-            parser = question.analyze()
-            result.update(parser)
-            results.append(result)
-            percentage = round(count/len(questions)*100,2)
-            logging.info('Processing the record number ::: {count}; Currently {percentage}% of the {dataset_name} is parsed'.format(count = count, percentage = percentage, dataset_name = dataset_name))
-        except:
-            logging.error('An error occured in analyzing the following question: {}'.format(question.question))
-            errors.append(question.question)
+        # try:
+        count += 1
+        result = {}
+        result['question'] = question.question
+        result['id'] = question.id
+        result['source'] = question.source
+        result['title'] = question.title
+        parser = question.analyze()
+        result.update(parser)
+        results.append(result)
+        percentage = round(count / len(questions) * 100, 2)
+        logging.info(
+            'Processing the record number ::: {count}; Currently {percentage}% of the {dataset_name} is parsed'.format(
+                count=count, percentage=percentage, dataset_name=dataset_name))
+        logging.info("parse tree: " + str(question.sentence.parse_tree))
+        # except:
+        #     logging.error('An error occured in analyzing the following question: {}'.format(question.question))
+        #     errors.append(question.question)
     with open('parsing_result/{}.json'.format(dataset_name), 'w') as outfile:
         json.dump(results, outfile)
     # with open('parsing_result/{}_error.json'.format(dataset_name), 'w') as outfile:
@@ -1021,18 +1039,18 @@ elmo = Elmo(options_file, weight_file, 2, dropout=0)
 actv_emb = elmo(batch_to_ids([[v] for v in actv]))['elmo_representations'][0].detach().numpy()
 stav_emb = elmo(batch_to_ids([[v] for v in stav]))['elmo_representations'][0].detach().numpy()
 
-# logging.info('The program starts to parse test samples')
-# samples = read_dummy_samples()
-# analyze(samples, 'Samples')
+logging.info('The program starts to parse test samples')
+samples = read_dummy_samples()
+analyze(samples, 'Samples')
 
-logging.info('The program starts to parse GeoAnQu...')
-geoanqu = read_file_geoanqu('data/datasets/GeoAnQu.csv')
-analyze(geoanqu, 'GeoAnQu')
-
-logging.info('The program starts to parse GeoQuestion201...')
-geoquestion201 = read_file_201_dataset('data/datasets/GeoQuestion201.csv')
-analyze(geoquestion201, 'GeoQuestion201')
-
-logging.info('The program starts to parse MS MARCO...')
-msmarco = read_msmarco_dataset('data/datasets/MS MARCO.csv')
-analyze(msmarco, 'MS MARCO')
+# logging.info('The program starts to parse GeoAnQu...')
+# geoanqu = read_file_geoanqu('data/datasets/GeoAnQu.csv')
+# analyze(geoanqu, 'GeoAnQu')
+#
+# logging.info('The program starts to parse GeoQuestion201...')
+# geoquestion201 = read_file_201_dataset('data/datasets/GeoQuestion201.csv')
+# analyze(geoquestion201, 'GeoQuestion201')
+#
+# logging.info('The program starts to parse MS MARCO...')
+# msmarco = read_msmarco_dataset('data/datasets/MS MARCO.csv')
+# analyze(msmarco, 'MS MARCO')
