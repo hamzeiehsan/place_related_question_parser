@@ -1,0 +1,16 @@
+__pycache__/
+.idea/
+.ipynb.*/
+csv/
+!csv/.gitkeep
+evaluation/
+!evaluation/.gitkeep
+graphs/
+!graphs/.gitkeep
+ngrams/
+!ngrams/.gitkeep
+parsing_result/
+!parsing_result/.gitkeep
+.*.zip
+todo
+.*.ipynb
