@@ -66,8 +66,3 @@ class CPARSER:
     def construct_tree(sentence):
         parse_results = CPARSER.parse(sentence)
         return Tree(parse_results)
-
-
-# events = NER.extract_events('Which cities affected by the Hurricane Dorian?')
-# logging.info("www")
-tree = CPARSER.construct_tree('Which cities affected by the Hurricane Dorian by the sunset?')

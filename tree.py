@@ -66,9 +66,11 @@ class Tree:
             return res
         return search.findall(self.root, filter_=lambda node: node.name in string.split())
 
-    def label_role(self, name, role):
+    def label_role(self, name, role, clean=False):
         nodes = self.find_node_by_name(name)
         if len(nodes) == 1:
             nodes[0].role = role
+            if clean:
+                nodes[0].children = []
             return True
         return False
