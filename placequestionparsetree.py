@@ -28,12 +28,11 @@ class PlaceQuestionParseTree:
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None
+        self.root = None
         self.construct_tree()
 
     def construct_tree(self):
         root = AnyNode(name=self.parse_dict['word'], nodeType=self.parse_dict['nodeType'], role='')
-        temp = self.parse_dict
-
         if 'children' in self.parse_dict.keys():
             for child in self.parse_dict['children']:
                 self.add_to_tree(child, root)
