@@ -131,7 +131,7 @@ stav_emb = elmo(batch_to_ids([[v] for v in stav]))['elmo_representations'][0].de
 
 logging.info('The program starts to parse test samples')
 
-question = "Which cities are affected by the hurricanes in the USA since the last decade?"
+question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
 result = extract_information(question, pt_set, et_set)
 tree = CPARSER.construct_tree(question)
 
@@ -144,4 +144,21 @@ for k,v in ENCODINGS.items():
             if status is False:
                 logging.error('error in finding {} in the tree'.format(item))
 
+logging.info('tree:\n'+str(tree))
+
+tree.clean_tree()
+logging.info('tree:\n'+str(tree))
+
+
+tree.label_spatiotemporal_relationships()
+logging.info('tree:\n'+str(tree))
+
+
+tree.clean_locations()
+logging.info('tree:\n'+str(tree))
+
+tree.update()
+logging.info('tree:\n'+str(tree))
+
+tree.label_non_platial_objects()
 logging.info('tree:\n'+str(tree))
