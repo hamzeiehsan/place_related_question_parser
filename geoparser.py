@@ -1,5 +1,5 @@
 from ner import NER, CPARSER
-from tree import Tree, AnyNode
+from placequestionparsetree import PlaceQuestionParseTree, AnyNode
 from utils import Utils
 
 

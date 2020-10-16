@@ -24,7 +24,7 @@ import anytree.cachedsearch as search
 #         return self.name+"{"+self.role+"} "
 
 
-class Tree:
+class PlaceQuestionParseTree:
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None

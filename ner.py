@@ -1,5 +1,5 @@
 import logging
-from tree import AnyNode, Tree
+from placequestionparsetree import AnyNode, PlaceQuestionParseTree
 from allennlp import pretrained
 
 logging.basicConfig(level=logging.INFO)
@@ -65,4 +65,4 @@ class CPARSER:
     @staticmethod
     def construct_tree(sentence):
         parse_results = CPARSER.parse(sentence)
-        return Tree(parse_results)
+        return PlaceQuestionParseTree(parse_results)
