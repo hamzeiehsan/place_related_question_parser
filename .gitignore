@@ -14,3 +14,4 @@ parsing_result/
 *.zip
 todo
 *.ipynb
+test.py

@@ -9,6 +9,7 @@ from allennlp.modules.elmo import Elmo, batch_to_ids
 logging.basicConfig(level=logging.INFO)
 model = pretrained.fine_grained_named_entity_recognition_with_elmo_peters_2018()
 parsemodel = pretrained.span_based_constituency_parsing_with_elmo_joshi_2018()
+dependencymodel = pretrained.biaffine_parser_universal_dependencies_todzat_2017()
 
 up_name_tags = ['U-GPE', 'U-LOC', 'U-FAC', 'U-ORG']
 cp_name_tags = ['B-GPE', 'B-LOC', 'B-FAC', 'B-ORG', 'I-GPE', 'I-LOC', 'I-FAC', 'I-ORG', 'L-GPE', 'L-LOC', 'L-FAC',
@@ -94,9 +95,9 @@ class Embedding:
             stav_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.situation_embs.squeeze(),
                                                                       verb_emb).max()
             actv_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.activity_embs.squeeze(), verb_emb).max()
-            if actv_similar > max(stav_similar, 0.35):
+            if actv_similar > max(stav_similar, 0.5):
                 decisions.append('a')
-            elif stav_similar > max(actv_similar, 0.35):
+            elif stav_similar > max(actv_similar, 0.5):
                 decisions.append('s')
             else:
                 decisions.append('u')

@@ -4,6 +4,9 @@ import anytree.cachedsearch as search
 
 
 class PlaceQuestionParseTree:
+    spatiotemporal_propositions = ['in', 'of', 'on', 'at', 'within', 'from', 'to', 'near', 'close', 'between', 'beside',
+                                   'by', 'since', 'until', 'before', 'after']
+
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None
@@ -70,7 +73,8 @@ class PlaceQuestionParseTree:
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("P", "p", "d"))
         for named_object in named_objects:
             for sibling in named_object.siblings:
-                if sibling.nodeType == 'IN' and named_object.parent.nodeType.startswith('PP'):
+                if sibling.nodeType == 'IN' and named_object.parent.nodeType.startswith('PP') and\
+                        sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
                     sibling.role = 'r'
                     if len(named_object.siblings) == 1:
                         named_object.parent.role = 'LOCATION'
@@ -140,7 +144,6 @@ class PlaceQuestionParseTree:
                     parent.role = 'o'
                     parent.children = []
 
-
     def get_verbs(self):
         verb_nodes = search.findall(self.root,
                                     filter_=lambda node: node.nodeType.startswith("VB") and ' ' not in node.name)
@@ -187,3 +190,31 @@ class PlaceQuestionParseTree:
                 node.role = 'EVENT'
             elif actions > 0 and events == 0:
                 node.role = 'ACTION'
+
+    def label_numeric_values(self):
+        nodes = search.findall(self.root, filter_=lambda node: node.nodeType == 'CD' and node.role == '' and
+                               len(node.children) == 0)
+        for node in nodes:
+            node.role = 'n'
+
+    def label_conjunctions(self):
+        nodes = search.findall(self.root, filter_=lambda node: node.nodeType in ('CC', 'IN', 'SCONJ', 'CCONJ')
+                                                               and node.role == '' and len(node.children) == 0)
+        for node in nodes:
+            if node.name in ['and', 'both']:
+                node.role = '&'
+            elif node.name in ['or', 'whether']:
+                node.role = '|'
+            elif node.name in ['not', 'neither', 'nor', 'but', 'except']:
+                node.role = '!'
+
+            siblings = search.findall(node.parent, filter_=lambda node: node.role not in ('&', '|', '!', 'q') and
+                                      node.nodeType != 'DT' and (node.role != '' or node.nodeType == ','))
+            sibling_roles = set()
+            for sibling in siblings:
+                if sibling.nodeType == ',':
+                    sibling.role = node.role
+                else:
+                    sibling_roles.add(sibling.role)
+            if len(sibling_roles) == 1:
+                node.parent.role = list(sibling_roles)[0]
