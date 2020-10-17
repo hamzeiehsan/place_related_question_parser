@@ -1,16 +1,10 @@
-from ner import NER, CPARSER
-from placequestionparsetree import PlaceQuestionParseTree, AnyNode
-from utils import Utils
+from ner import NER, CPARSER, Embedding
 
-
-import csv
-import json
 import logging
-import re
-from allennlp.modules.elmo import Elmo, batch_to_ids
 
 
 logging.basicConfig(level=logging.INFO)
+
 
 # load place type
 def load_pt(fpt):
@@ -118,20 +112,12 @@ actv = load_word(factv)
 stav = load_word(fstav)
 countries = load_word(fcountries)
 
-# loading ELMo pretrained word embedding model
-options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
-weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
-
-elmo = Elmo(options_file, weight_file, 2, dropout=0)
-
-# Verb Elmo representation
-actv_emb = elmo(batch_to_ids([[v] for v in actv]))['elmo_representations'][0].detach().numpy()
-stav_emb = elmo(batch_to_ids([[v] for v in stav]))['elmo_representations'][0].detach().numpy()
-
+Embedding.set_stative_active_words(stav, actv)
 
 logging.info('The program starts to parse test samples')
 
-question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
+# question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
+question = "Where can I buy coffee and watch movies in Melbourne?"
 result = extract_information(question, pt_set, et_set)
 tree = CPARSER.construct_tree(question)
 
@@ -161,4 +147,13 @@ tree.update()
 logging.info('tree:\n'+str(tree))
 
 tree.label_non_platial_objects()
+logging.info('tree:\n'+str(tree))
+
+
+verbs = tree.get_verbs()
+decisions = Embedding.verb_encoding(tree.root.name, verbs)
+tree.label_situation_activities(verbs=verbs, decisions=decisions)
+logging.info('tree:\n'+str(tree))
+
+tree.label_events_actions()
 logging.info('tree:\n'+str(tree))

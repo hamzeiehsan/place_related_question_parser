@@ -1,6 +1,10 @@
 import logging
+
+import sklearn
+
 from placequestionparsetree import AnyNode, PlaceQuestionParseTree
 from allennlp import pretrained
+from allennlp.modules.elmo import Elmo, batch_to_ids
 
 logging.basicConfig(level=logging.INFO)
 model = pretrained.fine_grained_named_entity_recognition_with_elmo_peters_2018()
@@ -66,3 +70,46 @@ class CPARSER:
     def construct_tree(sentence):
         parse_results = CPARSER.parse(sentence)
         return PlaceQuestionParseTree(parse_results)
+
+
+class Embedding:
+    # loading ELMo pretrained word embedding model
+    options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
+    weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
+
+    elmo = Elmo(options_file, weight_file, 2, dropout=0)
+
+    activity_embs = None
+    situation_embs = None
+
+    @staticmethod
+    def verb_encoding(sentence, verbs):
+        if not Embedding.is_loaded():
+            raise RuntimeError from None
+        decisions = []
+        emb = Embedding.elmo(batch_to_ids([sentence.split()]))['elmo_representations'][0].detach().numpy()
+        for verb in verbs:
+            v_index = sentence.split().index(verb)
+            verb_emb = [emb[0][v_index]]
+            stav_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.situation_embs.squeeze(),
+                                                                      verb_emb).max()
+            actv_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.activity_embs.squeeze(), verb_emb).max()
+            if actv_similar > max(stav_similar, 0.35):
+                decisions.append('a')
+            elif stav_similar > max(actv_similar, 0.35):
+                decisions.append('s')
+            else:
+                decisions.append('u')
+        return decisions
+
+    @staticmethod
+    def set_stative_active_words(stative, active):
+        # Verb Elmo representation
+        Embedding.activity_embs = Embedding.elmo(batch_to_ids([[v] for v in active]))['elmo_representations'][0].detach().numpy()
+        Embedding.situation_embs = Embedding.elmo(batch_to_ids([[v] for v in stative]))['elmo_representations'][0].detach().numpy()
+
+    @staticmethod
+    def is_loaded():
+        if Embedding.situation_embs is None or Embedding.activity_embs is None:
+            return False
+        return True

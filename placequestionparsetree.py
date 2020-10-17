@@ -1,4 +1,5 @@
 from anytree import AnyNode, RenderTree, PostOrderIter
+
 import anytree.cachedsearch as search
 
 
@@ -138,3 +139,51 @@ class PlaceQuestionParseTree:
                 if all_objects:
                     parent.role = 'o'
                     parent.children = []
+
+
+    def get_verbs(self):
+        verb_nodes = search.findall(self.root,
+                                    filter_=lambda node: node.nodeType.startswith("VB") and ' ' not in node.name)
+        verbs = []
+        for node in verb_nodes:
+            verbs.append(node.name)
+        return verbs
+
+    def label_situation_activities(self, verbs, decisions):
+        verb_nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("VB") and node.name in verbs)
+        for i in range(len(verbs)):
+            node = verb_nodes[i]
+            decision = decisions[i]
+            if decision != 'u':
+                node.role = decision
+            else:
+                print("this verb is suspicious: " + str(node.name))
+        situations = search.findall(self.root, filter_=lambda  node: node.role == 's')
+        for situation in situations:
+            for sibiling in situation.siblings:
+                if sibiling.role == '' and sibiling.nodeType == 'PP':
+                    if len(search.findall(sibiling, filter_=lambda node: node.role in ('e', 'o', 'E'))) > 0:
+                        sibiling.role = 's'
+
+        activities = search.findall(self.root, filter_=lambda node: node.role == 'a')
+        for activity in activities:
+            for sibiling in activity.siblings:
+                if sibiling.role == '' and sibiling.nodeType == 'PP':
+                    if len(search.findall(sibiling, filter_=lambda node: node.role in ('o'))) > 0:
+                        sibiling.role = 'a'
+
+    def label_events_actions(self):
+        nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("V") and 'P' in node.nodeType and
+                        node.role == '')
+        for node in nodes:
+            actions = 0
+            events = 0
+            for child in node.children:
+                if child.role == 'a':
+                    actions += 1
+                if child.role == 's':
+                    events += 1
+            if events > 0 and actions == 0:
+                node.role = 'EVENT'
+            elif actions > 0 and events == 0:
+                node.role = 'ACTION'

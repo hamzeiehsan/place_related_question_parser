@@ -45,6 +45,18 @@ promise
 realize
 recognize
 remember
+affect
+affectd
+influence
+alter
+altered
+control
+govern
+governed
+infect
+infected
+change
+changed
 resemble    
 satisfy
 see
@@ -70,4 +82,6 @@ growing
 grown
 kill
 killed
-
+born
+happened
+happen
