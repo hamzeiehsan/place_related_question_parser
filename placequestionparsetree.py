@@ -218,3 +218,106 @@ class PlaceQuestionParseTree:
                     sibling_roles.add(sibling.role)
             if len(sibling_roles) == 1:
                 node.parent.role = list(sibling_roles)[0]
+
+    def label_qualities(self):
+        nodes = search.findall()
+
+
+class Dependency:
+    def __init__(self, node1, relation, node2=None):
+        self.arg1 = node1
+        self.relation = relation
+        self.arg2 = node2
+
+    def is_binary(self):
+        if self.arg2 is None:
+            return False
+        return True
+
+    def __repr__(self):
+        string = str(self.relation)+':\n\t'+str(self.arg1)
+        if self.is_binary():
+            string += '\n\t'+str(self.arg2)
+        return string
+
+
+class PlaceDependencyTree:
+    def __init__(self, dependency_dict):
+        self.dict = dependency_dict
+        self.root = None
+        self.tree = None
+        self.construct_dependencies()
+        self.dependencies = []
+
+    def construct_dependencies(self):
+        root = AnyNode(name=self.dict['word'], nodeType=self.dict['nodeType'],
+                       attributes=self.dict['attributes'], spans=self.dict['spans'], link=self.dict['link'])
+        if 'children' in self.dict.keys():
+            for child in self.dict['children']:
+                self.add_to_tree(child, root)
+        self.root = root
+        self.tree = RenderTree(root)
+
+    def add_to_tree(self, node, parent):
+        n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent,
+                    attributes=node['attributes'], spans=node['spans'],
+                    link=node['link'])
+        if 'children' in node.keys():
+            for child in node['children']:
+                self.add_to_tree(child, n)
+
+    def render(self):
+        self.tree = RenderTree(self.root)
+
+    def __repr__(self):
+        if self.tree is None:
+            return "Empty Tree"
+        res = ""
+        for pre, fill, node in self.tree:
+            res+="%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.attributes)+"\n"
+        return res
+
+    def detect_conjunctions(self):
+        conjunctions = search.findall(self.root, filter_=lambda node: node.nodeType == 'conj')
+        for conj in conjunctions:
+            is_cc = False
+            relation = None
+            for child in conj.children:
+                if 'CCONJ' in child.attributes:
+                    is_cc = True
+                    relation = PlaceDependencyTree.clone_node_without_children(child)
+                    break
+                elif 'SCONJ' in child.attributes:
+                    relation = PlaceDependencyTree.clone_node_without_children(child)
+                    break
+            if is_cc:
+                second = PlaceDependencyTree.clone_node_without_children(conj)
+                first = PlaceDependencyTree.clone_node_without_children(conj.parent)
+                dep = Dependency(first, relation, second)
+                self.dependencies.append(dep)
+            elif relation is not None:
+                first = PlaceDependencyTree.clone_node_without_children(conj)
+                dep = Dependency(first, relation)
+                self.dependencies.append(dep)
+
+        excepts = search.findall(self.root, filter_=lambda node: node.nodeType == 'case' and 'ADP' in node.attributes)
+        for ex in excepts:
+            if ex.name in ['except', 'excluding']:
+                override = {'nodeType':'cc', 'attributes': ['SCONJ'], 'link':'conj'}
+                relation = PlaceDependencyTree.clone_node_without_children(ex, override)
+                first = PlaceDependencyTree.clone_node_without_children(ex.parent)
+                dep = Dependency(first, relation)
+                self.dependencies.append(dep)
+
+    @staticmethod
+    def clone_node_without_children(node, override={}):
+        if len(override) == 0:
+            return AnyNode(name=node.name, spans=node.spans, attributes=node.attributes,
+                       link=node.link, nodeType=node.nodeType)
+        else:
+            return AnyNode(name=node.name, spans=node.spans, attributes=override['attributes'],
+                           link=override['link'], nodeType=override['nodeType'])
+
+    def print_dependencies(self):
+        for dep in self.dependencies:
+            print(dep)
