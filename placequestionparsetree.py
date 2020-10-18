@@ -362,7 +362,6 @@ class PlaceDependencyTree:
                     dep = Dependency(first, relation, second)
                     self.dependencies.append(dep)
 
-
     @staticmethod
     def clone_node_without_children(node, override={}):
         if len(override) == 0:
