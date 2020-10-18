@@ -4,8 +4,8 @@ import logging
 import re
 
 import sklearn
-from allennlp import pretrained
 from allennlp.modules.elmo import Elmo, batch_to_ids
+from allennlp.predictors.predictor import Predictor
 
 from ner import NER
 from utils import Utils
@@ -1016,7 +1016,7 @@ def analyze(questions, dataset_name):
 PRONOUN = dict(
     {'where': '1', 'what': '2', 'which': '3', 'when': '4', 'why': '7'})
 CONDITIONAL = ['are', 'is', 'was', 'were', 'did', 'do', 'does']
-model = pretrained.span_based_constituency_parsing_with_elmo_joshi_2018()
+model = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/elmo-constituency-parser-2020.02.10.tar.gz")
 
 fpt = 'data/place_type/type-set.txt'
 factv = 'data/verb/action_verb.txt'

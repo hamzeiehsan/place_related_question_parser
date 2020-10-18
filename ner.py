@@ -3,13 +3,14 @@ import logging
 import sklearn
 
 from placequestionparsetree import AnyNode, PlaceQuestionParseTree
-from allennlp import pretrained
+from allennlp.predictors.predictor import Predictor
+import allennlp_models.rc
 from allennlp.modules.elmo import Elmo, batch_to_ids
 
 logging.basicConfig(level=logging.INFO)
-model = pretrained.fine_grained_named_entity_recognition_with_elmo_peters_2018()
-parsemodel = pretrained.span_based_constituency_parsing_with_elmo_joshi_2018()
-dependencymodel = pretrained.biaffine_parser_universal_dependencies_todzat_2017()
+model = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/ner-model-2020.02.10.tar.gz")
+parsemodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/elmo-constituency-parser-2020.02.10.tar.gz")
+dependencymodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/biaffine-dependency-parser-ptb-2020.04.06.tar.gz")
 
 up_name_tags = ['U-GPE', 'U-LOC', 'U-FAC', 'U-ORG']
 cp_name_tags = ['B-GPE', 'B-LOC', 'B-FAC', 'B-ORG', 'I-GPE', 'I-LOC', 'I-FAC', 'I-ORG', 'L-GPE', 'L-LOC', 'L-FAC',
