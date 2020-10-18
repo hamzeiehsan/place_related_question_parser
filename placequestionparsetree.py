@@ -35,11 +35,11 @@ class PlaceQuestionParseTree:
             return "Empty Tree"
         res = ""
         for pre, fill, node in self.tree:
-            res+="%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.role)+"\n"
+            res += "%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.role)+"\n"
         return res
 
     def find_node_by_exact_name(self, string):
-         return search.findall_by_attr(self.root, string)
+        return search.findall_by_attr(self.root, string)
 
     def find_node_by_name(self, string):
         res = self.find_node_by_exact_name(string)
@@ -184,7 +184,7 @@ class PlaceQuestionParseTree:
             for child in node.children:
                 if child.role == 'a':
                     actions += 1
-                if child.role == 's':
+                if child.role == 'e' or child.role == 'E':
                     events += 1
             if events > 0 and actions == 0:
                 node.role = 'EVENT'
@@ -218,9 +218,6 @@ class PlaceQuestionParseTree:
                     sibling_roles.add(sibling.role)
             if len(sibling_roles) == 1:
                 node.parent.role = list(sibling_roles)[0]
-
-    def label_qualities(self):
-        nodes = search.findall()
 
 
 class Dependency:
@@ -352,6 +349,19 @@ class PlaceDependencyTree:
                     relation = AnyNode(name='ADV', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
                     dep = Dependency(first, relation, second)
                     self.dependencies.append(dep)
+
+    def detect_verb_noun_relationships(self):
+        verbs = search.findall(self.root, filter_=lambda node: 'VERB' in node.attributes)
+        for verb in verbs:
+            nouns = search.findall(verb, filter_=lambda node: 'NOUN' in node.attributes or 'PROPN' in node.attributes)
+            for noun in nouns:
+                if noun.parent == verb and noun.link == 'obj':
+                    first = PlaceDependencyTree.clone_node_without_children(verb)
+                    second = PlaceDependencyTree.clone_node_without_children(noun)
+                    relation = AnyNode(name='OBJ', spans=[{}], attributes=None, link='HAS/RELATE', nodeType='RELATION')
+                    dep = Dependency(first, relation, second)
+                    self.dependencies.append(dep)
+
 
     @staticmethod
     def clone_node_without_children(node, override={}):
