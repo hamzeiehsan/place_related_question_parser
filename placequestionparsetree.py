@@ -309,6 +309,50 @@ class PlaceDependencyTree:
                 dep = Dependency(first, relation)
                 self.dependencies.append(dep)
 
+    def detect_adjectives(self):
+        adjectives = search.findall(self.root, filter_=lambda node: 'ADJ' in node.attributes and
+                                                                    node.link in ['amod', 'case'])
+        for adj in adjectives:
+            num_comparisons = search.findall(adj, filter_=lambda node: 'NUM' in node.attributes)
+            noun_comparisons = search.findall(adj, filter_=lambda
+                node: 'PROPN' in node.attributes or 'NOUN' in node.attributes)
+            if len(num_comparisons) > 0: # value comparison
+                for d in num_comparisons:
+                    first = PlaceDependencyTree.clone_node_without_children(adj.parent)
+                    relation = PlaceDependencyTree.clone_node_without_children(adj)
+                    second = PlaceDependencyTree.clone_node_without_children(d)
+                    dep = Dependency(first, relation, second)
+                    self.dependencies.append(dep)
+
+                    if d.parent.name in ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
+                                         'km', 'm', 'mi', 'yard']:
+                        first = PlaceDependencyTree.clone_node_without_children(d)
+                        second = PlaceDependencyTree.clone_node_without_children(d.parent)
+                        relation = AnyNode(name='UNIT', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
+                        dep = Dependency(first, relation, second)
+                        self.dependencies.append(dep)
+
+            elif len(noun_comparisons) > 0: # noun comparison
+                for n in noun_comparisons:
+                    first = PlaceDependencyTree.clone_node_without_children(adj.parent)
+                    relation = PlaceDependencyTree.clone_node_without_children(adj)
+                    second = PlaceDependencyTree.clone_node_without_children(n)
+                    dep = Dependency(first, relation, second)
+                    self.dependencies.append(dep)
+            else:
+                relation = AnyNode(name='ADJ', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
+                dep = Dependency(adj.parent, relation, adj)
+                self.dependencies.append(dep)
+
+            adverbs = search.findall(adj, maxlevel=1, filter_=lambda node: node.link == 'advmod')
+            if len(adverbs) > 0:
+                for adv in adverbs:
+                    first = PlaceDependencyTree.clone_node_without_children(adj)
+                    second = PlaceDependencyTree.clone_node_without_children(adv)
+                    relation = AnyNode(name='ADV', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
+                    dep = Dependency(first, relation, second)
+                    self.dependencies.append(dep)
+
     @staticmethod
     def clone_node_without_children(node, override={}):
         if len(override) == 0:
