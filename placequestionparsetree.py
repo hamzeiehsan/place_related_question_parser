@@ -277,16 +277,23 @@ class PlaceDependencyTree:
             res+="%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.attributes)+"\n"
         return res
 
+    def detect_dependencies(self):
+        if self.tree is not None:
+            self.detect_conjunctions()
+            self.detect_adjectives()
+            self.detect_verb_noun_relationships()
+            self.detect_complex_prepositions()
+
     def detect_conjunctions(self):
         conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
-                                                                      and node.nodeType in ['punct', 'dep'])
+                                                                      and node.nodeType in ['punct', 'dep', 'prep'])
         for conj in conjunctions:
             is_cc = 'CCONJ' in conj.attributes
             relation = PlaceDependencyTree.clone_node_without_children(conj)
+            first = PlaceDependencyTree.clone_node_without_children(conj.parent)
             if is_cc:
                 pairs = search.findall(conj.parent, filter_= lambda node: node.parent == conj.parent and
                                conj.parent.attributes[0] in node.attributes and node.link == 'dep')
-                first = PlaceDependencyTree.clone_node_without_children(conj.parent)
                 for pair in pairs:
                     second = PlaceDependencyTree.clone_node_without_children(pair)
                     dep = Dependency(first, relation, second)
@@ -295,8 +302,8 @@ class PlaceDependencyTree:
                 nodes = search.findall(conj, filter_=lambda node: node.link == 'dep' and
                                                            ('PROPN' in node.attributes or 'NOUN' in node.attributes))
                 for node in nodes:
-                    first = PlaceDependencyTree.clone_node_without_children(node)
-                    dep = Dependency(first, relation)
+                    second = PlaceDependencyTree.clone_node_without_children(node)
+                    dep = Dependency(first, relation, second)
                     self.dependencies.append(dep)
 
         excepts = search.findall(self.root, filter_=lambda node: node.nodeType == 'case' and 'ADP' in node.attributes)
@@ -380,6 +387,16 @@ class PlaceDependencyTree:
                     relation = AnyNode(name='OBJ', spans=[{}], attributes=None, link='HAS/RELATE', nodeType='RELATION')
                     dep = Dependency(first, relation, second)
                     self.dependencies.append(dep)
+
+    def detect_complex_prepositions(self):
+        preps = search.findall(self.root, filter_=lambda node: node.link == 'prep')
+        for prep in preps:
+            if 'ADV' in prep.parent.attributes and len(prep.parent.children) == 1:
+                first = PlaceDependencyTree.clone_node_without_children(prep)
+                second = PlaceDependencyTree.clone_node_without_children(prep.parent)
+                relation = AnyNode(name='PRP', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
+                dep = Dependency(first, relation, second)
+                self.dependencies.append(dep)
 
     @staticmethod
     def find_first_parent_based_on_attribute(node, attributes):

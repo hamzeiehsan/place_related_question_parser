@@ -122,6 +122,9 @@ question = "What is the population density of cities that are affected by the hu
 # question = "What are the large cities in England except London?"
 # question = "What is the land between Euphrates and Tigris"
 # question = "What is the land between Black Sea, Black Forest and the Danube?"
+# question = "Which counties of Ireland does River Shannon cross?"
+# question = "What is the most populated city in the United Kingdom except London?"
+question = "Where can I buy the best coffee and see exotic birds near to the Australian National Maritime Museum?"
 result = extract_information(question, pt_set, et_set)
 tree = CPARSER.construct_tree(question)
 

@@ -2,7 +2,7 @@ import logging
 
 import sklearn
 
-from placequestionparsetree import AnyNode, PlaceQuestionParseTree
+from placequestionparsetree import AnyNode, PlaceQuestionParseTree, PlaceDependencyTree
 from allennlp.predictors.predictor import Predictor
 import allennlp_models.rc
 from allennlp.modules.elmo import Elmo, batch_to_ids
@@ -74,6 +74,18 @@ class CPARSER:
         return PlaceQuestionParseTree(parse_results)
 
 
+class DPARSER:
+    @staticmethod
+    def parse(sentence):
+        res = dependencymodel.predict(sentence)
+        return res['hierplane_tree']['root']
+
+    @staticmethod
+    def construct_tree(sentence):
+        parse_results = DPARSER.parse(sentence)
+        return PlaceDependencyTree(parse_results)
+
+
 class Embedding:
     # loading ELMo pretrained word embedding model
     options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
@@ -96,9 +108,9 @@ class Embedding:
             stav_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.situation_embs.squeeze(),
                                                                       verb_emb).max()
             actv_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.activity_embs.squeeze(), verb_emb).max()
-            if actv_similar > max(stav_similar, 0.4):
+            if actv_similar > max(stav_similar, 0.35):
                 decisions.append('a')
-            elif stav_similar > max(actv_similar, 0.4):
+            elif stav_similar > max(actv_similar, 0.35):
                 decisions.append('s')
             else:
                 decisions.append('u')
