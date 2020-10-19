@@ -8,7 +8,7 @@ import allennlp_models.rc
 from allennlp.modules.elmo import Elmo, batch_to_ids
 
 logging.basicConfig(level=logging.INFO)
-model = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/ner-model-2020.02.10.tar.gz")
+nermodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/fine-grained-ner.2020-06-24.tar.gz")
 parsemodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/elmo-constituency-parser-2020.02.10.tar.gz")
 dependencymodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/biaffine-dependency-parser-ptb-2020.04.06.tar.gz")
 
@@ -27,7 +27,7 @@ noun_phrase_tags = ['NN, NNS']
 class NER:
     @staticmethod
     def parse(sentence):
-        res = model.predict(sentence=sentence)
+        res = nermodel.predict(sentence=sentence)
         return res
 
     @staticmethod
@@ -96,9 +96,9 @@ class Embedding:
             stav_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.situation_embs.squeeze(),
                                                                       verb_emb).max()
             actv_similar = sklearn.metrics.pairwise.cosine_similarity(Embedding.activity_embs.squeeze(), verb_emb).max()
-            if actv_similar > max(stav_similar, 0.5):
+            if actv_similar > max(stav_similar, 0.4):
                 decisions.append('a')
-            elif stav_similar > max(actv_similar, 0.5):
+            elif stav_similar > max(actv_similar, 0.4):
                 decisions.append('s')
             else:
                 decisions.append('u')

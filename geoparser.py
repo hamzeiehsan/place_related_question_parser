@@ -116,7 +116,7 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('The program starts to parse test samples')
 
-question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
+question = "What is the population density of cities that are affected by the hurricanes in the USA in the last century"
 # question = "Where can I buy coffee and watch movies in Melbourne?"
 # question = "Where can I buy coffee and watch movies within five km of my house?"
 # question = "What are the large cities in England except London?"

@@ -15,7 +15,7 @@ class PlaceQuestionParseTree:
 
     def construct_tree(self):
         root = AnyNode(name=self.parse_dict['word'], nodeType=self.parse_dict['nodeType'], role='',
-                       spans=self.parse_dict['spans'])
+                       spans={'start': 0, 'end': len(self.parse_dict['word'])})
         if 'children' in self.parse_dict.keys():
             for child in self.parse_dict['children']:
                 self.add_to_tree(child, root)
@@ -23,7 +23,9 @@ class PlaceQuestionParseTree:
         self.tree = RenderTree(root)
 
     def add_to_tree(self, node, parent):
-        n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent, role='', spans=node['spans'])
+        local_start = parent.name.find(node['word'])
+        n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent, role='',
+                    spans={'start': parent.spans['start']+local_start, 'end': parent.spans['start']+local_start+len(node['word'])})
         if 'children' in node.keys():
             for child in node['children']:
                 self.add_to_tree(child, n)
@@ -372,7 +374,7 @@ class PlaceDependencyTree:
         for verb in verbs:
             nouns = search.findall(verb, filter_=lambda node: 'NOUN' in node.attributes or 'PROPN' in node.attributes)
             for noun in nouns:
-                if noun.parent == verb and noun.link == 'dep':
+                if (noun.parent == verb and noun.link == 'dep') or (noun.parent.parent == verb and noun.link == 'pobj'):
                     first = PlaceDependencyTree.clone_node_without_children(verb)
                     second = PlaceDependencyTree.clone_node_without_children(noun)
                     relation = AnyNode(name='OBJ', spans=[{}], attributes=None, link='HAS/RELATE', nodeType='RELATION')
