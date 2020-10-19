@@ -14,7 +14,8 @@ class PlaceQuestionParseTree:
         self.construct_tree()
 
     def construct_tree(self):
-        root = AnyNode(name=self.parse_dict['word'], nodeType=self.parse_dict['nodeType'], role='')
+        root = AnyNode(name=self.parse_dict['word'], nodeType=self.parse_dict['nodeType'], role='',
+                       spans=self.parse_dict['spans'])
         if 'children' in self.parse_dict.keys():
             for child in self.parse_dict['children']:
                 self.add_to_tree(child, root)
@@ -22,7 +23,7 @@ class PlaceQuestionParseTree:
         self.tree = RenderTree(root)
 
     def add_to_tree(self, node, parent):
-        n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent, role='')
+        n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent, role='', spans=node['spans'])
         if 'children' in node.keys():
             for child in node['children']:
                 self.add_to_tree(child, n)
@@ -276,7 +277,7 @@ class PlaceDependencyTree:
 
     def detect_conjunctions(self):
         conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
-                                                                      and node.nodeType == 'punct')
+                                                                      and node.nodeType in ['punct', 'dep'])
         for conj in conjunctions:
             is_cc = 'CCONJ' in conj.attributes
             relation = PlaceDependencyTree.clone_node_without_children(conj)
@@ -307,12 +308,13 @@ class PlaceDependencyTree:
 
     def detect_adjectives(self):
         adjectives = search.findall(self.root, filter_=lambda node: 'ADJ' in node.attributes and
-                                                                    node.link in ['amod', 'case', 'dep', 'pobj'])
+                                                                    node.link in ['amod', 'case', 'dep', 'pobj', 'root'])
         for adj in adjectives:
             num_comparisons = search.findall(adj, filter_=lambda node: 'NUM' in node.attributes and
-                                             node.parent == adj)
+                                                                       (node.parent == adj or node.parent.link in ['pobj', 'prep']) )
             noun_comparisons = search.findall(adj, filter_=lambda
-                node: ('PROPN' in node.attributes or 'NOUN' in node.attributes) and node.parent == adj)
+                node: ('PROPN' in node.attributes or 'NOUN' in node.attributes) and node.link == 'dep' and
+                      (node.parent == adj or node.parent.link == 'prep'))
             if len(num_comparisons) > 0: # value comparison
                 for d in num_comparisons:
                     parent = PlaceDependencyTree.find_first_parent_based_on_attribute(adj, ['NOUN', 'PROPN'])
@@ -322,7 +324,7 @@ class PlaceDependencyTree:
                         second = PlaceDependencyTree.clone_node_without_children(d)
                         dep = Dependency(first, relation, second)
                         self.dependencies.append(dep)
-                    children = search.findall(d, filter_=lambda node: node.link == 'dep' and
+                    children = search.findall(d.parent, filter_=lambda node: node.link in ['dep', 'pobj'] and
                                                                       node.name in ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
                                          'km', 'm', 'mi', 'yard', 'hectare'])
                     for child in children:
@@ -341,10 +343,22 @@ class PlaceDependencyTree:
                     self.dependencies.append(dep)
             else:
                 relation = AnyNode(name='ADJ', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
-                dep = Dependency(adj.parent, relation, adj)
-                self.dependencies.append(dep)
+                dependency = None
+                if adj.parent is not None:
+                    dependency = search.findall(adj.parent, filter_=lambda node: (node.parent == adj.parent or node == adj.parent
+                                                                              or adj in node.ancestors)
+                                            and node.attributes[0] in ['NOUN', 'PROPN'])
+                else:
+                    dependency = search.findall(adj, filter_=lambda node: node.attributes[0] in ['NOUN', 'PROPN'] and node.parent == adj)
+                if len(dependency) == 1:
+                    first = PlaceDependencyTree.clone_node_without_children(dependency[0])
+                    dep = Dependency(first, relation, adj)
+                    self.dependencies.append(dep)
+                else:
+                    print('error -- adjective with multiple deps '+str(adj))
 
-            adverbs = search.findall(adj, filter_=lambda node: node.link == 'advmod' and node.parent == adj)
+            adverbs = search.findall(adj, filter_=lambda node: node.link in ['advmod', 'dep'] and
+                                                               node.parent == adj and 'ADV' in node.attributes)
             if len(adverbs) > 0:
                 for adv in adverbs:
                     first = PlaceDependencyTree.clone_node_without_children(adj)

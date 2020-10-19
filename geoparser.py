@@ -116,12 +116,12 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('The program starts to parse test samples')
 
-# question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
+question = "What is the population density of cities that are affected by the hurricanes in the USA since 1980?"
 # question = "Where can I buy coffee and watch movies in Melbourne?"
 # question = "Where can I buy coffee and watch movies within five km of my house?"
 # question = "What are the large cities in England except London?"
 # question = "What is the land between Euphrates and Tigris"
-question = "What is the land between Black Sea, Black Forest and the Danube?"
+# question = "What is the land between Black Sea, Black Forest and the Danube?"
 result = extract_information(question, pt_set, et_set)
 tree = CPARSER.construct_tree(question)
 
