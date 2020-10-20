@@ -41,6 +41,18 @@ class PlaceQuestionParseTree:
             res += "%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.role)+"\n"
         return res
 
+    def label_tree(self):
+        self.clean_tree()
+        self.label_conjunctions()
+
+        self.label_spatiotemporal_relationships()
+        self.clean_locations()
+        self.update()
+
+        self.label_non_platial_objects()
+        self.update()
+
+
     def find_node_by_exact_name(self, string):
         return search.findall_by_attr(self.root, string)
 
@@ -94,16 +106,17 @@ class PlaceQuestionParseTree:
         if len(named_objects) == 2: # todo more complex combinations are ignore: select if they belong to same VP parent
             if named_objects[0].depth < named_objects[1].depth:
                 if self.root.name.index(named_objects[0].name) < self.root.name.index(named_objects[1].name):
-                    self.merge(node1=named_objects[0], node2=named_objects[1])
+                    PlaceQuestionParseTree.merge(node1=named_objects[0], node2=named_objects[1])
                 else:
-                    self.merge(node1=named_objects[0], node2=named_objects[1], order=False)
+                    PlaceQuestionParseTree.merge(node1=named_objects[0], node2=named_objects[1], order=False)
             else:
                 if self.root.name.index(named_objects[0].name) < self.root.name.index(named_objects[1].name):
-                    self.merge(node1=named_objects[1], node2=named_objects[0], order=False)
+                    PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0], order=False)
                 else:
-                    self.merge(node1=named_objects[1], node2=named_objects[0])
+                    PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0])
 
-    def merge(self, node1, node2, order=True):
+    @staticmethod
+    def merge(node1, node2, order=True):
         node = None
         if order:
             node = AnyNode(name=node1.name + ' ' + node2.name, nodeType=node1.nodeType, role=node1.role)
@@ -221,7 +234,24 @@ class PlaceQuestionParseTree:
                     sibling_roles.add(sibling.role)
             if len(sibling_roles) == 1:
                 node.parent.role = list(sibling_roles)[0]
+        self.update()
 
+    @staticmethod
+    def context_builder(list_str, node):
+        boolean_var = True
+        for string in list_str: # multi-word?
+            boolean_var = boolean_var and string in node.name
+        return boolean_var
+
+    def search_context(self, list_str):
+        nodes = search.findall(self.root, filter_=lambda node: PlaceQuestionParseTree.context_builder(list_str, node))
+        max_depth = -1
+        selected = None
+        for node in nodes:
+            if node.depth > max_depth:
+                max_depth = node.depth
+                selected = node
+        return selected
 
 class Dependency:
     def __init__(self, node1, relation, node2=None):

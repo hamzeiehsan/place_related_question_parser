@@ -125,7 +125,11 @@ question = "What is the population density of cities that are affected by the hu
 # question = "Which counties of Ireland does River Shannon cross?"
 # question = "What is the most populated city in the United Kingdom except London?"
 question = "Where can I buy the best coffee and see exotic birds near to the Australian National Maritime Museum?"
+
+# extract NER using fine-grained NER model
 result = extract_information(question, pt_set, et_set)
+
+# construct and constituency tree dependency tree
 tree = CPARSER.construct_tree(question)
 
 logging.info('tree:\n'+str(tree))
@@ -137,33 +141,15 @@ for k,v in ENCODINGS.items():
             if status is False:
                 logging.error('error in finding {} in the tree'.format(item))
 
-logging.info('tree:\n'+str(tree))
-
-tree.clean_tree()
-logging.info('tree:\n'+str(tree))
-
-
-tree.label_conjunctions()
-logging.info('tree:\n'+str(tree))
-
-tree.label_spatiotemporal_relationships()
-logging.info('tree:\n'+str(tree))
-
-
-tree.clean_locations()
-logging.info('tree:\n'+str(tree))
-
-tree.update()
-logging.info('tree:\n'+str(tree))
-
-tree.label_non_platial_objects()
-logging.info('tree:\n'+str(tree))
-
+tree.label_tree()
 
 verbs = tree.get_verbs()
 decisions = Embedding.verb_encoding(tree.root.name, verbs)
 tree.label_situation_activities(verbs=verbs, decisions=decisions)
+tree.label_events_actions()
+
 logging.info('tree:\n'+str(tree))
 
-tree.label_events_actions()
-logging.info('tree:\n'+str(tree))
+# construct dependency tree and extract dependencies
+
+# update constituency tree with dependencies
