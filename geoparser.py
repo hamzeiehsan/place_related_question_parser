@@ -1,4 +1,4 @@
-from ner import NER, CPARSER, Embedding
+from ner import NER, CPARSER, Embedding, DPARSER
 
 import logging
 
@@ -151,5 +151,8 @@ tree.label_events_actions()
 logging.info('tree:\n'+str(tree))
 
 # construct dependency tree and extract dependencies
+d_tree = DPARSER.construct_tree(question)
+d_tree.detect_dependencies()
+tree.apply_dependencies(d_tree.dependencies)
 
 # update constituency tree with dependencies

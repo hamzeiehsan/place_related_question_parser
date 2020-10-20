@@ -239,8 +239,8 @@ class PlaceQuestionParseTree:
     @staticmethod
     def context_builder(list_str, node):
         boolean_var = True
-        for string in list_str: # multi-word?
-            boolean_var = boolean_var and string in node.name
+        for string in list_str:
+            boolean_var = boolean_var and string in node.name  # multi-word?
         return boolean_var
 
     def search_context(self, list_str):
@@ -252,6 +252,67 @@ class PlaceQuestionParseTree:
                 max_depth = node.depth
                 selected = node
         return selected
+
+    def apply_dependencies(self, dependencies):
+        verb_deps = []
+        cc_deps = []
+        adj_noun_deps = []
+        complex_prep = []
+        comparisons = [] # todo
+        for dependency in dependencies:
+            if dependency.relation.link == 'HAS/RELATE' and 'VERB' in dependency.arg1.attributes and (
+                    'NOUN' in dependency.arg2.attributes or 'PROPN' in dependency.arg2.attributes):
+                verb_deps.append(dependency)
+            elif dependency.relation.link == 'IS/ARE' and dependency.relation.name == 'ADJ':
+                adj_noun_deps.append(dependency)
+            elif dependency.relation.link == 'IS/ARE' and dependency.relation.name == 'PRP':
+                complex_prep.append(dependency)
+            elif dependency.relation.attributes is not None:
+                if 'CCONJ' in dependency.relation.attributes or 'SCONJ' in dependency.relation.attributes:
+                    cc_deps.append(dependency)
+                elif dependency.relation.name != 'RELATION' and 'ADJ' in dependency.relation.attributes:
+                    comparisons.append(dependency)
+        print('Complex Prepositions:')
+        self.apply_complex_relationships_dependencies(complex_prep)
+        print('Verb-Noun Relationships:')
+        self.apply_verb_noun_dependencies(verb_deps)
+        print('Conjunctions:')
+        self.apply_conjunction_dependencies(cc_deps)
+        print('Adjective-Noun Relationships:')
+        self.apply_adj_noun_dependencies(adj_noun_deps)
+        print('Comparisons:')
+        self.apply_comparison_dependencies(comparisons)
+
+    def apply_verb_noun_dependencies(self, dependencies):
+        for dep in dependencies:
+            str_list = [dep.arg1.name, dep.arg2.name]
+            context = self.search_context(str_list)
+            print(context)
+
+    def apply_complex_relationships_dependencies(self, dependencies):
+        for dep in dependencies:
+            str_list = [dep.arg1.name, dep.arg2.name]
+            context = self.search_context(str_list)
+            print(context)
+
+    def apply_conjunction_dependencies(self, dependencies):
+        for dep in dependencies:
+            str_list = [dep.relation.name, dep.arg1.name, dep.arg2.name]
+            context = self.search_context(str_list)
+            print(context)
+
+    def apply_adj_noun_dependencies(self, dependencies):
+        for dep in dependencies:
+            str_list = [dep.arg1.name, dep.arg2.name]
+            context = self.search_context(str_list)
+            print(context)
+
+    def apply_comparison_dependencies(self, dependencies):
+        for dep in dependencies:
+            str_list = [dep.relation.name, dep.arg1.name, dep.arg2.name]
+            context = self.search_context(str_list)
+            print(context)
+
 
 class Dependency:
     def __init__(self, node1, relation, node2=None):
