@@ -116,7 +116,7 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('The program starts to parse test samples')
 
-question = "What is the population density of cities that are affected by the hurricanes in the USA in the last century"
+# question = "What is the population density of cities that are affected by the hurricanes in the USA in the last century"
 # question = "Where can I buy coffee and watch movies in Melbourne?"
 # question = "Where can I buy coffee and watch movies within five km of my house?"
 # question = "What are the large cities in England except London?"
@@ -124,7 +124,9 @@ question = "What is the population density of cities that are affected by the hu
 # question = "What is the land between Black Sea, Black Forest and the Danube?"
 # question = "Which counties of Ireland does River Shannon cross?"
 # question = "What is the most populated city in the United Kingdom except London?"
-question = "Where can I buy the best coffee and see exotic birds near to the Australian National Maritime Museum?"
+# question = "Where can I buy the best coffee and see exotic birds near to the Australian National Maritime Museum?"
+# question ="Is Mount Everest taller than 1000 miles?"
+question ="Which tourist attractions in London are at most 3 km from St. Anthony the Great and St. John the Baptist church?"
 
 # extract NER using fine-grained NER model
 result = extract_information(question, pt_set, et_set)
@@ -133,15 +135,17 @@ result = extract_information(question, pt_set, et_set)
 tree = CPARSER.construct_tree(question)
 
 logging.info('tree:\n'+str(tree))
-
+multi_words = {}
 for k,v in ENCODINGS.items():
     if k in result.keys():
         for item in result[k]:
             status = tree.label_role(item, v, clean=True)
             if status is False:
                 logging.error('error in finding {} in the tree'.format(item))
+            if len(item.split(' ')) > 1:
+                multi_words[item] = {'start':question.index(item), 'end':question.index(item)+len(item)}
 
-tree.label_tree()
+multi_word_npo = tree.label_tree()
 
 verbs = tree.get_verbs()
 decisions = Embedding.verb_encoding(tree.root.name, verbs)
@@ -150,9 +154,13 @@ tree.label_events_actions()
 
 logging.info('tree:\n'+str(tree))
 
-# construct dependency tree and extract dependencies
+# construct dependency tree, cleaning and extract dependencies
 d_tree = DPARSER.construct_tree(question)
+d_tree.clean_d_tree(multi_words)
+d_tree.clean_d_tree(multi_word_npo)
+print(d_tree)
 d_tree.detect_dependencies()
-tree.apply_dependencies(d_tree.dependencies)
 
 # update constituency tree with dependencies
+tree.apply_dependencies(d_tree.dependencies)
+print('tree:\n'+str(tree))
