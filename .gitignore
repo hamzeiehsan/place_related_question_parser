@@ -15,3 +15,4 @@ parsing_result/
 todo
 *.ipynb
 test.py
+test*.py
