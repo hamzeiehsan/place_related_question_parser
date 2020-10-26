@@ -50,8 +50,9 @@ class PlaceQuestionParseTree:
         #self.update()
 
         res = self.label_non_platial_objects()
+        res2 = self.label_numbers()
         self.update()
-        return res
+        return {**res, **res2}
 
     def find_node_by_exact_name(self, string):
         return search.findall_by_attr(self.root, string)
@@ -238,6 +239,23 @@ class PlaceQuestionParseTree:
             if len(sibling_roles) == 1:
                 node.parent.role = list(sibling_roles)[0]
         self.update()
+
+    def label_numbers(self):
+        numbers = search.findall(self.root, filter_= lambda node: node.role == '' and node.nodeType == 'CD')
+        units = {}
+        for num in numbers:
+            num.role = 'n'
+            check = False
+            for sibling in num.parent.children:
+                if sibling == num:
+                    check = True
+                elif check and sibling.name in PlaceDependencyTree.UNITS:
+                    if num.parent.role == '':
+                        num.parent.role = 'MEASURE'
+                    if num.name+' '+sibling.name in self.root.name:
+                        units[num.name+' '+sibling.name] = {'start':self.root.name.index(num.name+' '+sibling.name),
+                                                            'end': self.root.name.index(num.name+' '+sibling.name )+len(num.name+' '+sibling.name )}
+        return units
 
     @staticmethod
     def context_builder(list_str, node):
@@ -462,7 +480,7 @@ class PlaceDependencyTree:
             is_cc = 'CCONJ' in conj.attributes
             relation = PlaceDependencyTree.clone_node_without_children(conj)
             first = None
-            if 'AUX' in conj.parent.attributes or 'VERB' in conj.parent:
+            if 'AUX' in conj.parent.attributes or 'VERB' in conj.parent.attributes:
                 temp = search.findall(conj.parent, filter_=lambda node: node.parent == conj.parent and node.link == 'nsubj')
                 print(temp)
                 if len(temp) == 1:
@@ -522,7 +540,7 @@ class PlaceDependencyTree:
                         dep = Dependency(first, relation, second)
                         self.dependencies.append(dep)
 
-            elif len(noun_comparisons) > 0: # noun comparison
+            elif len(noun_comparisons) > 0 and adj.parent is not None: # noun comparison
                 for n in noun_comparisons:
                     first = PlaceDependencyTree.clone_node_without_children(adj.parent)
                     relation = PlaceDependencyTree.clone_node_without_children(adj)
