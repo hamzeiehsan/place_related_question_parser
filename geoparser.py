@@ -5,6 +5,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there']
 
 # load place type
 def load_pt(fpt):
@@ -85,6 +86,14 @@ def find_types(question, excluded, types, specifics=[]):
 # find dates
 def find_dates(question):
     return NER.extract_dates(question)
+
+
+def find_compound_question_words(question):
+    res = {}
+    for comp in COMPOUNDS_QW:
+        if comp in question:
+            res[comp] = {'start':question.index(comp), 'end':question.index(comp)+len(comp)}
+    return res
 
 
 # extract information
@@ -176,8 +185,6 @@ for question in questions:
         if k in result.keys():
             for item in result[k]:
                 status = tree.label_role(item, v, clean=True)
-                if status is False:
-                    logging.error('error in finding {} in the tree'.format(item))
                 if len(item.split(' ')) > 1:
                     if item not in question:
                         string = item.replace(" 's", "'s")
@@ -187,7 +194,7 @@ for question in questions:
                         multi_words[item] = {'start': question.index(item), 'end': question.index(item) + len(item)}
 
     multi_word_npo = tree.label_tree()
-
+    coompound_qw = find_compound_question_words(question)
     verbs = tree.get_verbs()
     decisions = Embedding.verb_encoding(tree.root.name, verbs)
     tree.label_situation_activities(verbs=verbs, decisions=decisions)
@@ -199,6 +206,7 @@ for question in questions:
     d_tree = DPARSER.construct_tree(question)
     d_tree.clean_d_tree(multi_words)
     d_tree.clean_d_tree(multi_word_npo)
+    d_tree.clean_d_tree(coompound_qw)
 
     print(d_tree)
     d_tree.detect_dependencies()
@@ -208,5 +216,5 @@ for question in questions:
     # tree.apply_dependencies(d_tree.dependencies)
     # print('tree:\n' + str(tree))
     is_it_ok = 'n'
-    while is_it_ok != 'y':
+    while is_it_ok == 'y':
         is_it_ok = input('y to proceed')

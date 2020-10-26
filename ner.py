@@ -9,6 +9,7 @@ from allennlp.modules.elmo import Elmo, batch_to_ids
 
 logging.basicConfig(level=logging.INFO)
 nermodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/fine-grained-ner.2020-06-24.tar.gz")
+nercoasemodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/ner-model-2020.02.10.tar.gz")
 parsemodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/elmo-constituency-parser-2020.02.10.tar.gz")
 dependencymodel = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/biaffine-dependency-parser-ptb-2020.04.06.tar.gz")
 
@@ -31,9 +32,16 @@ class NER:
         return res
 
     @staticmethod
-    def extract_entities(sentence, u_list, cp_list):
+    def parse_coarse(sentence):
+        return nercoasemodel.predict(sentence)
+
+    @staticmethod
+    def extract_entities(sentence, u_list, cp_list, is_coarse = False):
         entities = []
-        parsed = NER.parse(sentence)
+        if is_coarse:
+            parsed = NER.parse_coarse(sentence)
+        else:
+            parsed = NER.parse(sentence)
         current = ''
         for i in range(0, len(parsed['tags'])):
             logging.debug('i: {} word: {} and tag: {}'.format(i, parsed['words'][i], parsed['tags'][i]))
@@ -51,7 +59,26 @@ class NER:
 
     @staticmethod
     def extract_place_names(sentence):
-        return NER.extract_entities(sentence, up_name_tags, cp_name_tags)
+        fine_grains = NER.extract_entities(sentence, up_name_tags, cp_name_tags)
+        coarse_grains = NER.extract_entities(sentence, up_name_tags, cp_name_tags, is_coarse=True)
+        if len(fine_grains) >= len(coarse_grains):
+            return fine_grains
+        else:
+            for loc in coarse_grains:
+                found = False
+                for floc in fine_grains:
+                    if loc in floc:
+                        found = True
+                        break
+                    elif floc in loc:
+                        del fine_grains[floc]
+                        fine_grains.append(loc)
+                        found = True
+                        break
+                if not found:
+                    fine_grains.append(loc)
+        return fine_grains
+
 
     @staticmethod
     def extract_dates(sentence):

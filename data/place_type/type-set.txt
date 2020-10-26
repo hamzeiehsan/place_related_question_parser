@@ -60,8 +60,6 @@ archipelagos
 archipelago
 archipelagoes
 archipelago
-areas
-area
 atolls
 atoll
 boroughs
@@ -694,3 +692,53 @@ tourist attractions
 visitor attraction
 visitor attractions
 land
+underground line
+underground lines
+underground station
+underground stations
+point
+points
+spot
+spots
+car park
+car parks
+council area
+council areas
+national park
+national parks
+department store
+department stores
+capital
+capitals
+footbal staduim
+footbal staduims
+university college
+university colleges
+modern art museum
+modern art museums
+train station
+train stations
+metropolitain county
+metropolitain counties
+royal borough
+royal boroughs
+airfield
+airfields
+historic building
+historic buildings
+Greek resturant
+Greek resturants
+Welsh district
+Welsh districts
+gas station
+gas stations
+country councils
+country council
+non metropolitan counties
+non metropolitan county
+main railway stations
+main railway station
+historical monuments
+historical monument
+medieval castles
+medieval castle

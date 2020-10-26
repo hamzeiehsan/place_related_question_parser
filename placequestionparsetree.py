@@ -71,11 +71,21 @@ class PlaceQuestionParseTree:
                 nodes[0].children = []
             return True
         else:
+            min_depth = 1000
+            selected = None
             for node in nodes:
-                if node.nodeType.startswith("N"):
-                    node.role = role
-                    if clean:
-                        node.children = []
+                if node.depth < min_depth and node.name not in ['of']:
+                    min_depth = node.depth
+                    selected = node
+                else:
+                    node.parent = None
+                selected.name = name
+                selected.nodeType = 'NP'
+                selected.role = role
+                # if node.nodeType.startswith("N"):
+                #     node.role = role
+                #     if clean:
+                #         node.children = []
         return False
 
     def clean_tree(self):
@@ -156,7 +166,7 @@ class PlaceQuestionParseTree:
             if parent is not None:
                 all_objects = True
                 for child in parent.children:
-                    if child.role != 'o' and child.nodeType != 'DT':
+                    if child.role != 'o' and child.nodeType != 'DT' and  child.role != 'p':
                         all_objects = False
                 if all_objects:
                     parent.role = 'o'
