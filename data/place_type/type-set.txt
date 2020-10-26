@@ -742,3 +742,5 @@ historical monuments
 historical monument
 medieval castles
 medieval castle
+Scottish county
+Scottish counties
