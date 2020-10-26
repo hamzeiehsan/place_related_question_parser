@@ -71,6 +71,10 @@ def find_types(question, excluded, types, specifics=[]):
                     captured.append(specific+' '+type)
                     is_it_combined = True
                     break
+                elif not type.endswith("s") and 'the '+type+' of '+ specific in whole_question: # not plural and have the pattern the type of P
+                    captured.append('the '+type+' of '+ specific)
+                    is_it_combined = True
+                    break
             if not is_it_combined:
                 captured.append(type)
     captured = sorted(captured, key=len, reverse=True)
@@ -216,5 +220,5 @@ for question in questions:
     # tree.apply_dependencies(d_tree.dependencies)
     # print('tree:\n' + str(tree))
     is_it_ok = 'n'
-    while is_it_ok == 'y':
+    while is_it_ok != 'y':
         is_it_ok = input('y to proceed')
