@@ -1,4 +1,5 @@
 from ner import NER, CPARSER, Embedding, DPARSER
+import re
 
 import logging
 
@@ -154,6 +155,9 @@ ENCODINGS = dict(
 COMPARISON = {'more than': '>', 'less than': '<', 'greater than': '>', 'smaller than': '<', 'equal to': '=',
               'at most': '<=', 'at least': '>='}
 
+COMPARISON_REGEX = {'more .* than': 'more than', 'less .* than':'less than', 'greater .* than': 'greater than',
+                    'smaller .* than': 'smaller than'}
+
 fpt = 'data/place_type/type-set.txt'
 factv = 'data/verb/action_verb.txt'
 fstav = 'data/verb/stative_verb.txt'
@@ -225,30 +229,34 @@ for question in questions:
         if q in question:
             compounds[q] = {'start': question.index(q), 'end': question.index(q) + len(q)}
     tree.clean_single_child()
+    tree.clean_tree()
+    if 'Greater Manchester dedicated to' in question:
+        print('wait')
     compound_relationships = tree.label_spatiotemporal_relationships()
     logging.info('tree:\n' + str(tree))
     for c in compound_relationships:
         if c in question:
             compounds[c] = {'start': question.index(c), 'end': question.index(c) + len(c)}
 
-    if len(compound_relationships) > 0:
-        print('wait here')
-
     flag = False
     for c, v in COMPARISON.items():
         if c in question:
             flag = True
             tree.label_role(c, v, comparison=True)
-            compounds[c] = {'start': question.index(c), 'end': question.index(c) + len(c)} # todo: pattern matching more [counties] than
+            compounds[c] = {'start': question.index(c), 'end': question.index(c) + len(c)}
+    for creg, c in COMPARISON_REGEX.items():
+        reg_search = re.search(creg, question)
+        if reg_search is not None:
+            tree.label_complex_comparison(reg_search, c, COMPARISON[c])
+
     tree.label_events_actions()
     tree.clean_single_child()
     logging.info('tree:\n' + str(tree))
-    if flag:
-        print('wait')
+
 
     # construct dependency tree, cleaning and extract dependencies
     d_tree = DPARSER.construct_tree(question)
-    d_tree.clean_d_tree(multi_words)
+    d_tree.clean_d_tree(multi_words) # todo: clean siblings as well...
     d_tree.clean_d_tree(multi_word_npo)
     d_tree.clean_d_tree(compound_qw)
     d_tree.clean_d_tree(compounds)

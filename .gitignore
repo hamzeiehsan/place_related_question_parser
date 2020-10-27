@@ -16,3 +16,8 @@ todo
 *.ipynb
 test.py
 test[1-9].py
+generate_samples.py
+parse.py
+readme.md
+utils.py
+visualization.py

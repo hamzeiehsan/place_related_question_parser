@@ -1,3 +1,49 @@
+car park
+car parks
+council area
+council areas
+national park
+national parks
+department store
+department stores
+capital
+capitals
+footbal staduim
+footbal staduims
+university college
+university colleges
+modern art museum
+modern art museums
+train station
+train stations
+metropolitain county
+metropolitain counties
+royal borough
+royal boroughs
+airfield
+airfields
+historic building
+historic buildings
+Greek resturant
+Greek resturants
+Welsh district
+Welsh districts
+gas station
+gas stations
+country councils
+country council
+non metropolitan counties
+non metropolitan county
+main railway stations
+main railway station
+historical monuments
+historical monument
+medieval castles
+medieval castle
+Scottish county
+Scottish counties
+art museum
+art museums
 summits
 summit
 gates
@@ -700,47 +746,3 @@ point
 points
 spot
 spots
-car park
-car parks
-council area
-council areas
-national park
-national parks
-department store
-department stores
-capital
-capitals
-footbal staduim
-footbal staduims
-university college
-university colleges
-modern art museum
-modern art museums
-train station
-train stations
-metropolitain county
-metropolitain counties
-royal borough
-royal boroughs
-airfield
-airfields
-historic building
-historic buildings
-Greek resturant
-Greek resturants
-Welsh district
-Welsh districts
-gas station
-gas stations
-country councils
-country council
-non metropolitan counties
-non metropolitan county
-main railway stations
-main railway station
-historical monuments
-historical monument
-medieval castles
-medieval castle
-Scottish county
-Scottish counties

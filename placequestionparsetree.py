@@ -17,6 +17,7 @@ class PlaceQuestionParseTree:
                                     ' in the range of \d.* ',
                                     ' north ', ' south ', ' east ', ' west ', ' part ',
                                     ' northeast ', ' southeast ', ' northwest ', ' southwest ']
+
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None
@@ -106,16 +107,18 @@ class PlaceQuestionParseTree:
     def clean_tree(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("E", "P", "e", "p", "d", "o"))
         for named_object in named_objects:
-            if len(named_object.siblings) == 1 and named_object.siblings[0].nodeType == 'DT':
+            if len(named_object.siblings) == 1 and (named_object.siblings[0].nodeType == 'DT'):
                 named_object.parent.role = named_object.role
                 named_object.parent.children = []
+            elif len(named_object.siblings) == 1 and named_object.siblings[0].role == named_object.role:
+                named_object.parent.role = named_object.role
 
     def label_spatiotemporal_relationships(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("P", "p", "d"))
         compound_relationships = []
         for named_object in named_objects:
             for sibling in named_object.siblings:
-                if sibling.nodeType == 'IN' and named_object.parent.nodeType.startswith('PP') and\
+                if sibling.nodeType == 'IN' and named_object.parent.nodeType in ['PP', 'VP'] and\
                         sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
                     if named_object.role == 'd':
                         sibling.role = 'r'
@@ -138,7 +141,7 @@ class PlaceQuestionParseTree:
         context = prep.parent
         text = ''
         while not matched:
-            regex_search = re.search(pattern, context.name)
+            regex_search = re.search(pattern.strip(), context.name)
             if regex_search is not None:
                 matched = True
                 text = context.name[regex_search.regs[0][0]: regex_search.regs[0][1]]
@@ -187,7 +190,6 @@ class PlaceQuestionParseTree:
                 for a in after:
                     a.parent = context
 
-
     @staticmethod
     def iterate_and_find(node, text):
         res = []
@@ -198,6 +200,31 @@ class PlaceQuestionParseTree:
             elif text.strip() != '':
                 res.extend(PlaceQuestionParseTree.iterate_and_find(child, text))
         return res
+
+    def label_complex_comparison(self, reg_results, comparison, role):
+        contexts = search.findall(self.root, filter_=lambda node: node.spans['start']<=reg_results.regs[0][0] and
+                                 node.spans['end']>=reg_results.regs[0][1])
+        context = None
+        vals = comparison.split()
+        max_depth = -1
+        for c in contexts:
+            if c.depth >= max_depth:
+                context = c
+                max_depth = c.depth
+        first = search.findall(context, filter_=lambda node: node.name == vals[0])[0]
+
+        if first.parent.children.index(first)+1 == len(first.parent.children):
+            return
+        elif first.parent.children[first.parent.children.index(first)+1].role not in ['p', 'e', 'o']:
+            return
+
+        second = search.findall(context, filter_=lambda node: node.name == vals[1])[0]
+        if first.parent != second.parent:
+            second.parent.name = second.parent.name.replace(second.name, '').strip()
+            second.parent = None
+            first.parent.name = first.parent.name + ' '+second.name
+        first.name = comparison
+        first.role = role
 
     def clean_locations(self):
         # todo conjunction not yet implemented but should take place before calling this function
