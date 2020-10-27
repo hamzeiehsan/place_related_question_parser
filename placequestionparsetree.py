@@ -63,7 +63,7 @@ class PlaceQuestionParseTree:
             return res
         return search.findall(self.root, filter_=lambda node: node.name in string.split())
 
-    def label_role(self, name, role, clean=False):
+    def label_role(self, name, role, clean=False, question_words=False):
         nodes = self.find_node_by_name(name)
         if len(nodes) == 1:
             nodes[0].role = role
@@ -80,7 +80,10 @@ class PlaceQuestionParseTree:
                 else:
                     node.parent = None
                 selected.name = name
-                selected.nodeType = 'NP'
+                if question_words and self.root.name.startswith(name):
+                    selected.nodeType = 'WH'
+                elif not question_words:
+                    selected.nodeType = 'NP'
                 selected.role = role
                 # if node.nodeType.startswith("N"):
                 #     node.role = role
@@ -125,6 +128,19 @@ class PlaceQuestionParseTree:
                     PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0], order=False)
                 else:
                     PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0])
+
+    def clean_single_child(self):
+        single_child_nodes = search.findall(self.root, filter_= lambda node: len(node.children) == 1)
+        for node in single_child_nodes:
+            try:
+                if node.role == '':
+                    node.role = node.children[0].role
+                node.nodeType = node.children[0].nodeType
+                children = node.children[0].children
+                node.children[0].parent = None
+                node.children = children
+            except:
+                print('error in cleaning...')
 
     @staticmethod
     def merge(node1, node2, order=True):
@@ -256,6 +272,7 @@ class PlaceQuestionParseTree:
         for num in numbers:
             num.role = 'n'
             check = False
+            added = False
             for sibling in num.parent.children:
                 if sibling == num:
                     check = True
@@ -265,7 +282,69 @@ class PlaceQuestionParseTree:
                     if num.name+' '+sibling.name in self.root.name:
                         units[num.name+' '+sibling.name] = {'start':self.root.name.index(num.name+' '+sibling.name),
                                                             'end': self.root.name.index(num.name+' '+sibling.name )+len(num.name+' '+sibling.name )}
+                        added = True
+            if not added and num.parent.nodeType == 'QP' and num.parent.parent is not None:
+                found = False
+                for child in num.parent.parent.children:
+                    if child == num.parent:
+                        found = True
+                    elif found and child.name in PlaceDependencyTree.UNITS:
+                        new_node = AnyNode(child.parent, role='MESAURE', name=num.name + ' ' + child.name, nodeType='NP')
+                        num.parent = new_node
+                        child.parent = new_node
+                        units[new_node.name] = {'start': self.root.name.index(new_node.name),
+                                                'end': self.root.name.index(new_node.name) + len(new_node.name)}
         return units
+
+    def label_qualities(self):
+        compounds = []
+        adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('AD'))
+        for adj in adjectives:
+            if len(search.findall(adj, filter_= lambda node: node.nodeType in ['CC', 'NP', 'NNS', 'NN'])) == 0:
+                res = PlaceQuestionParseTree.label_adjective_roles(adj)
+                compounds.extend(res)
+        other_adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('J') and node.parent.role == '')
+        for adj in other_adjectives:
+            res = PlaceQuestionParseTree.label_adjective_roles(adj)
+            compounds.extend(res)
+        return compounds
+
+    @staticmethod
+    def label_adjective_roles(adj):
+        compounds = []
+        found = False
+        for child in adj.parent.children:
+            if child == adj:
+                found = True
+            elif found and child.nodeType.startswith('N'):
+                if child.role in ['o', 'e', 'E']:
+                    adj.role = 'q'
+                elif child.role in ['p', 'P']:
+                    adj.role = 'Q'
+                else:
+                    print('unresolved adjective! ' + adj.name + ' ' + child.name)
+                if ' ' in adj.name:
+                    compounds.append(adj.name)
+                break
+            elif found and child.nodeType in['PP', 'IN']:
+                if child.nodeType == 'IN':
+                    adj.parent = None
+                    child.name = adj.name+' '+child.name
+                    compounds.append(child.name)
+                elif child.nodeType == 'PP' and child.children[0].nodeType == 'IN':
+                    if len(adj.parent.children) == 2:
+                        child.parent = adj.parent
+                        child.name = adj.name + ' '+ child.name
+                        adj.parent = None
+                        child.children[0].name = adj.name+' '+child.children[0].name
+                        compounds.append(child.children[0].name)
+                    else:
+                        adj.parent = None
+                        child.children[0].name = adj.name + ' ' + child.children[0].name
+                        compounds.append(child.children[0].name)
+                else:
+                    print('unresolved adjective '+ adj.name + ' ' + child.name)
+        return compounds
 
     @staticmethod
     def context_builder(list_str, node):

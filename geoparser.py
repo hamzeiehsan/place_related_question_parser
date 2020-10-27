@@ -6,6 +6,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there']
+COMPOUNDS_QW_ROLE = {'How many':7, 'Are there':'9', 'Is there':'9'}
 
 # load place type
 def load_pt(fpt):
@@ -35,7 +36,7 @@ def load_word(fword):
 # load dataset
 def load_dataset(path):
     questions = []
-    fdataset = open(path, 'r', encoding='utf8')
+    fdataset = open(path, 'r', encoding='utf-8-sig')
     for line in fdataset.readlines():
         questions.append(line)
     fdataset.close()
@@ -198,19 +199,31 @@ for question in questions:
                         multi_words[item] = {'start': question.index(item), 'end': question.index(item) + len(item)}
 
     multi_word_npo = tree.label_tree()
-    coompound_qw = find_compound_question_words(question)
+    compound_qw = find_compound_question_words(question)
+    for qw in compound_qw:
+        role = ''
+        if qw in COMPOUNDS_QW_ROLE.keys():
+            role = COMPOUNDS_QW_ROLE[qw]
+        tree.label_role(qw, role, clean=True, question_words=True)
+
     verbs = tree.get_verbs()
     decisions = Embedding.verb_encoding(tree.root.name, verbs)
     tree.label_situation_activities(verbs=verbs, decisions=decisions)
     tree.label_events_actions()
-
+    q_compounds = tree.label_qualities() # clean and select compounds for d_tree clean...
+    compound_qualities = {}
+    for q in q_compounds:
+        if q in question:
+            compound_qualities[q] = {'start':question.index(q), 'end':question.index(q)+len(q)}
+    tree.clean_single_child()
     logging.info('tree:\n' + str(tree))
 
     # construct dependency tree, cleaning and extract dependencies
     d_tree = DPARSER.construct_tree(question)
     d_tree.clean_d_tree(multi_words)
     d_tree.clean_d_tree(multi_word_npo)
-    d_tree.clean_d_tree(coompound_qw)
+    d_tree.clean_d_tree(compound_qw)
+    d_tree.clean_d_tree(compound_qualities)
 
     print(d_tree)
     d_tree.detect_dependencies()
@@ -220,5 +233,5 @@ for question in questions:
     # tree.apply_dependencies(d_tree.dependencies)
     # print('tree:\n' + str(tree))
     is_it_ok = 'n'
-    while is_it_ok != 'y':
+    while is_it_ok == 'y':
         is_it_ok = input('y to proceed')
