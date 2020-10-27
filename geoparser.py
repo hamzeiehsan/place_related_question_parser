@@ -210,12 +210,14 @@ for question in questions:
     decisions = Embedding.verb_encoding(tree.root.name, verbs)
     tree.label_situation_activities(verbs=verbs, decisions=decisions)
     tree.label_events_actions()
-    q_compounds = tree.label_qualities() # clean and select compounds for d_tree clean...
+    q_compounds = tree.label_qualities()
     compound_qualities = {}
     for q in q_compounds:
         if q in question:
-            compound_qualities[q] = {'start':question.index(q), 'end':question.index(q)+len(q)}
+            compound_qualities[q] = {'start': question.index(q), 'end': question.index(q)+len(q)}
     tree.clean_single_child()
+    tree.label_spatiotemporal_relationships()
+    tree.label_events_actions()
     logging.info('tree:\n' + str(tree))
 
     # construct dependency tree, cleaning and extract dependencies
@@ -226,12 +228,16 @@ for question in questions:
     d_tree.clean_d_tree(compound_qualities)
 
     print(d_tree)
-    d_tree.detect_dependencies()
-    print(d_tree.dependencies)
+    # d_tree.detect_dependencies()
+    # print(d_tree.dependencies)
 
     # update constituency tree with dependencies
     # tree.apply_dependencies(d_tree.dependencies)
     # print('tree:\n' + str(tree))
+
     is_it_ok = 'n'
     while is_it_ok == 'y':
+        is_it_ok = input('y to proceed')
+
+    if 'at most 3 km from St. Anthony the' in question:
         is_it_ok = input('y to proceed')

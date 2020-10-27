@@ -1,5 +1,15 @@
 occupy
 occupies
+cross
+crosses
+flow
+flows
+border
+borders
+intersect
+intersects
+connect
+connects
 appear
 astonish
 believe

@@ -1,12 +1,20 @@
 from anytree import AnyNode, RenderTree, PostOrderIter
+import re
 
 import anytree.cachedsearch as search
 
 
 class PlaceQuestionParseTree:
     spatiotemporal_propositions = ['in', 'of', 'on', 'at', 'within', 'from', 'to', 'near', 'close', 'between', 'beside',
-                                   'by', 'since', 'until', 'before', 'after']
-
+                                   'by', 'since', 'until', 'before', 'after', 'close to', 'near to', 'closest to',
+                                   'nearest to']
+    complex_spatial_propositions = ['within \d.* ',
+                                    'at most \d.* ',
+                                    'less than \d.* away ',
+                                    'more than \d.* away ',
+                                    'in \d.* radius ',
+                                    'in a range of \d.* ',
+                                    'in the range of \d.* ']
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None
@@ -104,15 +112,74 @@ class PlaceQuestionParseTree:
             for sibling in named_object.siblings:
                 if sibling.nodeType == 'IN' and named_object.parent.nodeType.startswith('PP') and\
                         sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
-                    sibling.role = 'r'
-                    if len(named_object.siblings) == 1:
-                        named_object.parent.role = 'LOCATION'
-                    else:
-                        node = AnyNode(name=sibling.name+' '+named_object.name, nodeType='PP', role='LOCATION')
-                        node.parent = named_object.parent
-                        named_object.parent = node
-                        sibling.parent = node
-                    break
+                    if named_object.role == 'd':
+                        sibling.role = 'r'
+                    else: # complex spatial relationship with ['of', 'from', 'to']
+                        sibling.role = 'R'
+                        if sibling.name in ['of', 'to', 'from']:
+                            for reg in PlaceQuestionParseTree.complex_spatial_propositions:
+                                pattern = reg + sibling.name
+                                regex_search = re.search(pattern, self.root.name)
+                                if regex_search is not None:
+                                    self.label_complex_spatial_relationships(sibling, pattern)
+                                    print('test')
+                    named_object.parent.role = 'LOCATION'
+
+    def label_complex_spatial_relationships(self, prep, pattern):
+        matched = False
+        context = prep.parent
+        text = ''
+        while not matched:
+            regex_search = re.search(pattern, context.name)
+            if regex_search is not None:
+                matched = True
+                text = context.name[regex_search.regs[0][0]: regex_search.regs[0][1]]
+                break
+            if context.parent is None:
+                break
+            context = context.parent
+        if matched:
+            if context.name == text:
+                context.role = 'R'
+            else:
+                nodes = PlaceQuestionParseTree.iterate_and_find(context, text)
+                new_node = AnyNode(name=text, nodeType='IN', role='R')
+                before = []
+                after = []
+                firstparent = nodes[0].parent
+                for child in firstparent.children:
+                    if child in nodes:
+                        break
+                    before.append(child)
+
+                lastparent = prep.parent
+                for child in lastparent.children:
+                    if child not in nodes:
+                        after.append(child)
+
+                firstparent.children = []
+                for b in before:
+                    b.parent = firstparent
+
+                for node in nodes:
+                    node.parent = new_node
+
+                new_node.parent = firstparent
+
+                for a in after:
+                    a.parent = firstparent
+
+
+    @staticmethod
+    def iterate_and_find(node, text):
+        res = []
+        for child in node.children:
+            if child.name in text:
+                res.append(child)
+                text = text.replace(child.name, '', 1)
+            elif text.strip() != '':
+                res.extend(PlaceQuestionParseTree.iterate_and_find(child, text))
+        return res
 
     def clean_locations(self):
         # todo conjunction not yet implemented but should take place before calling this function
@@ -176,6 +243,8 @@ class PlaceQuestionParseTree:
         res = {}
         for npo in npos:
             npo.role = 'o'
+            if npo.name in ['border', 'cross', 'crosses', 'borders']:
+                npo.role = 's'
 
         for npo in npos:
             parent = npo.parent
