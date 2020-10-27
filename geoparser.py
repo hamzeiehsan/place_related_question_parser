@@ -5,8 +5,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there']
-COMPOUNDS_QW_ROLE = {'How many':7, 'Are there':'9', 'Is there':'9'}
+COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there', 'In which']
+COMPOUNDS_QW_ROLE = {'How many':6, 'Are there':'8', 'Is there':'8', 'In which': '3'}
+
+
 
 # load place type
 def load_pt(fpt):
@@ -141,12 +143,16 @@ def extract_information(question, ptypes, etypes):
 
 
 PRONOUN = dict(
-    {'where': '1', 'what': '2', 'which': '3', 'when': '4', 'why': '7'})
+    {'Where': '1', 'What': '2', 'Which': '3', 'When': '4', 'How': '5', 'Why': '7', 'Does': '8',
+     'Is': '8', 'Are': '8', 'Do': '8'})
 CONDITIONAL = ['are', 'is', 'was', 'were', 'did', 'do', 'does']
 
 ENCODINGS = dict(
     {'toponyms': 'P', 'place_types': 'p', 'events': 'E', 'event_types': 'e', 'dates': 'd', 'spatial_relationship': 'r',
      'qualities': 'q', 'activities': 'a', 'situations': 's', 'non-platial_objects': 'o'})
+
+COMPARISON = {'more than': '>', 'less than': '<', 'greater than': '>', 'smaller than': '<', 'equal to': '=',
+              'at most': '<=', 'at least': '>='}
 
 fpt = 'data/place_type/type-set.txt'
 factv = 'data/verb/action_verb.txt'
@@ -199,6 +205,9 @@ for question in questions:
                         multi_words[item] = {'start': question.index(item), 'end': question.index(item) + len(item)}
 
     multi_word_npo = tree.label_tree()
+    for k, v in PRONOUN.items():
+        if question.startswith(k+' '):
+            tree.label_role(k, v, question_words=True)
     compound_qw = find_compound_question_words(question)
     for qw in compound_qw:
         role = ''
@@ -211,21 +220,38 @@ for question in questions:
     tree.label_situation_activities(verbs=verbs, decisions=decisions)
     tree.label_events_actions()
     q_compounds = tree.label_qualities()
-    compound_qualities = {}
+    compounds = {}
     for q in q_compounds:
         if q in question:
-            compound_qualities[q] = {'start': question.index(q), 'end': question.index(q)+len(q)}
+            compounds[q] = {'start': question.index(q), 'end': question.index(q) + len(q)}
     tree.clean_single_child()
-    tree.label_spatiotemporal_relationships()
-    tree.label_events_actions()
+    compound_relationships = tree.label_spatiotemporal_relationships()
     logging.info('tree:\n' + str(tree))
+    for c in compound_relationships:
+        if c in question:
+            compounds[c] = {'start': question.index(c), 'end': question.index(c) + len(c)}
+
+    if len(compound_relationships) > 0:
+        print('wait here')
+
+    flag = False
+    for c, v in COMPARISON.items():
+        if c in question:
+            flag = True
+            tree.label_role(c, v, comparison=True)
+            compounds[c] = {'start': question.index(c), 'end': question.index(c) + len(c)} # todo: pattern matching more [counties] than
+    tree.label_events_actions()
+    tree.clean_single_child()
+    logging.info('tree:\n' + str(tree))
+    if flag:
+        print('wait')
 
     # construct dependency tree, cleaning and extract dependencies
     d_tree = DPARSER.construct_tree(question)
     d_tree.clean_d_tree(multi_words)
     d_tree.clean_d_tree(multi_word_npo)
     d_tree.clean_d_tree(compound_qw)
-    d_tree.clean_d_tree(compound_qualities)
+    d_tree.clean_d_tree(compounds)
 
     print(d_tree)
     # d_tree.detect_dependencies()
@@ -237,7 +263,4 @@ for question in questions:
 
     is_it_ok = 'n'
     while is_it_ok == 'y':
-        is_it_ok = input('y to proceed')
-
-    if 'at most 3 km from St. Anthony the' in question:
         is_it_ok = input('y to proceed')

@@ -8,13 +8,15 @@ class PlaceQuestionParseTree:
     spatiotemporal_propositions = ['in', 'of', 'on', 'at', 'within', 'from', 'to', 'near', 'close', 'between', 'beside',
                                    'by', 'since', 'until', 'before', 'after', 'close to', 'near to', 'closest to',
                                    'nearest to']
-    complex_spatial_propositions = ['within \d.* ',
-                                    'at most \d.* ',
-                                    'less than \d.* away ',
-                                    'more than \d.* away ',
-                                    'in \d.* radius ',
-                                    'in a range of \d.* ',
-                                    'in the range of \d.* ']
+    complex_spatial_propositions = [' within \d.* ',
+                                    ' at most \d.* ',
+                                    ' less than \d.* away ',
+                                    ' more than \d.* away ',
+                                    ' in \d.* radius ',
+                                    ' in a range of \d.* ',
+                                    ' in the range of \d.* ',
+                                    ' north ', ' south ', ' east ', ' west ', ' part ',
+                                    ' northeast ', ' southeast ', ' northwest ', ' southwest ']
     def __init__(self, parse_dict):
         self.parse_dict = parse_dict
         self.tree = None
@@ -71,7 +73,7 @@ class PlaceQuestionParseTree:
             return res
         return search.findall(self.root, filter_=lambda node: node.name in string.split())
 
-    def label_role(self, name, role, clean=False, question_words=False):
+    def label_role(self, name, role, clean=False, question_words=False, comparison=False):
         nodes = self.find_node_by_name(name)
         if len(nodes) == 1:
             nodes[0].role = role
@@ -90,7 +92,9 @@ class PlaceQuestionParseTree:
                 selected.name = name
                 if question_words and self.root.name.startswith(name):
                     selected.nodeType = 'WH'
-                elif not question_words:
+                elif comparison:
+                    selected.nodeType = 'JJR'
+                elif not question_words and not comparison:
                     selected.nodeType = 'NP'
                 selected.role = role
                 # if node.nodeType.startswith("N"):
@@ -108,6 +112,7 @@ class PlaceQuestionParseTree:
 
     def label_spatiotemporal_relationships(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("P", "p", "d"))
+        compound_relationships = []
         for named_object in named_objects:
             for sibling in named_object.siblings:
                 if sibling.nodeType == 'IN' and named_object.parent.nodeType.startswith('PP') and\
@@ -116,14 +121,17 @@ class PlaceQuestionParseTree:
                         sibling.role = 'r'
                     else: # complex spatial relationship with ['of', 'from', 'to']
                         sibling.role = 'R'
+                        if ' ' in sibling.name:
+                            compound_relationships.append(sibling.name)
                         if sibling.name in ['of', 'to', 'from']:
                             for reg in PlaceQuestionParseTree.complex_spatial_propositions:
                                 pattern = reg + sibling.name
                                 regex_search = re.search(pattern, self.root.name)
                                 if regex_search is not None:
+                                    compound_relationships.append(self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]])
                                     self.label_complex_spatial_relationships(sibling, pattern)
-                                    print('test')
                     named_object.parent.role = 'LOCATION'
+        return compound_relationships
 
     def label_complex_spatial_relationships(self, prep, pattern):
         matched = False
@@ -146,7 +154,13 @@ class PlaceQuestionParseTree:
                 new_node = AnyNode(name=text, nodeType='IN', role='R')
                 before = []
                 after = []
+
                 firstparent = nodes[0].parent
+                if firstparent != context:
+                    for child in context.children:
+                        if self.root.name.index(child.name) + len(child.name) <= self.root.name.index(text):
+                            before.append(child)
+
                 for child in firstparent.children:
                     if child in nodes:
                         break
@@ -156,18 +170,22 @@ class PlaceQuestionParseTree:
                 for child in lastparent.children:
                     if child not in nodes:
                         after.append(child)
-
-                firstparent.children = []
+                while lastparent != context:
+                    lastparent = lastparent.parent
+                    for child in lastparent.children:
+                        if self.root.name.index(text)+len(text)<=self.root.name.index(child.name):
+                            after.append(child)
+                context.children = []
                 for b in before:
-                    b.parent = firstparent
+                    b.parent = context
 
                 for node in nodes:
                     node.parent = new_node
 
-                new_node.parent = firstparent
+                new_node.parent = context
 
                 for a in after:
-                    a.parent = firstparent
+                    a.parent = context
 
 
     @staticmethod
