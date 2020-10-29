@@ -8,8 +8,8 @@ department store
 department stores
 capital
 capitals
-footbal staduim
-footbal staduims
+football stadium
+football stadiums
 university college
 university colleges
 modern art museum
@@ -26,8 +26,8 @@ historic building
 historic buildings
 Greek resturant
 Greek resturants
-Welsh district
 Welsh districts
+Welsh district
 gas station
 gas stations
 country councils
@@ -44,6 +44,8 @@ Scottish county
 Scottish counties
 art museum
 art museums
+county council
+county councils
 summits
 summit
 gates
@@ -459,6 +461,8 @@ urban sprawls
 urban sprawl
 metropolitan area
 metropolitan areas
+metropolitan counties
+metropolitan county
 ethnoburbs
 ethnoburb
 built-up area
@@ -489,6 +493,8 @@ cities
 city
 city block
 city blocks
+city council
+city councils
 clinic
 clinics
 coastline

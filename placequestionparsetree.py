@@ -115,7 +115,7 @@ class PlaceQuestionParseTree:
 
     def label_spatiotemporal_relationships(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("P", "p", "d"))
-        compound_relationships = []
+        compound_relationships = {}
         for named_object in named_objects:
             for sibling in named_object.siblings:
                 if sibling.nodeType == 'IN' and named_object.parent.nodeType in ['PP', 'VP'] and\
@@ -125,13 +125,14 @@ class PlaceQuestionParseTree:
                     else: # complex spatial relationship with ['of', 'from', 'to']
                         sibling.role = 'R'
                         if ' ' in sibling.name:
-                            compound_relationships.append(sibling.name)
+                            compound_relationships[sibling.name] = {'start': self.root.name.index(sibling.name),
+                                                                    'end': self.root.name.index(sibling.name) + len(sibling.name)}
                         if sibling.name in ['of', 'to', 'from']:
                             for reg in PlaceQuestionParseTree.complex_spatial_propositions:
                                 pattern = reg + sibling.name
                                 regex_search = re.search(pattern, self.root.name)
                                 if regex_search is not None:
-                                    compound_relationships.append(self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]])
+                                    compound_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0], 'end': regex_search.regs[0][1]}
                                     self.label_complex_spatial_relationships(sibling, pattern)
                     named_object.parent.role = 'LOCATION'
         return compound_relationships
@@ -227,9 +228,8 @@ class PlaceQuestionParseTree:
         first.role = role
 
     def clean_locations(self):
-        # todo conjunction not yet implemented but should take place before calling this function
         named_objects = search.findall(self.root, filter_=lambda node: node.role == 'LOCATION')
-        if len(named_objects) == 2: # todo more complex combinations are ignore: select if they belong to same VP parent
+        if len(named_objects) == 2:
             if named_objects[0].depth < named_objects[1].depth:
                 if self.root.name.index(named_objects[0].name) < self.root.name.index(named_objects[1].name):
                     PlaceQuestionParseTree.merge(node1=named_objects[0], node2=named_objects[1])
@@ -656,7 +656,7 @@ class PlaceDependencyTree:
     def clean_d_tree(self, str_dict):
         for k, v in str_dict.items():
             nodes = search.findall(self.root, filter_=lambda node: node.spans[0]['start'] >= v['start'] and
-            node.spans[0]['end'] <= v['end']+1 and node.name in k)
+            node.spans[0]['end'] <= v['end']+3 and node.name in k)
             selected = None
             depth = 1000
             for node in nodes:
@@ -665,12 +665,12 @@ class PlaceDependencyTree:
                     depth = node.depth
             children = []
             if selected is not None:
-                selected.name = k
                 for node in nodes:
                     if node != selected:
                         node.parent = None
                         for child in node.children:
                             children.append(child)
+                selected.name = k
             for child in children:
                 if child.parent is not None:
                     child.parent = selected

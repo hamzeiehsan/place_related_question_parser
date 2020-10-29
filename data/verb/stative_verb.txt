@@ -22,6 +22,9 @@ cost
 depend
 deserve
 dislike
+dislikes
+discharge
+discharges
 doubt
 exist
 feel
