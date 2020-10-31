@@ -126,13 +126,19 @@ class PlaceQuestionParseTree:
                         sibling.role = 'R'
                         if ' ' in sibling.name:
                             compound_relationships[sibling.name] = {'start': self.root.name.index(sibling.name),
-                                                                    'end': self.root.name.index(sibling.name) + len(sibling.name)}
+                                                                    'end': self.root.name.index(sibling.name) + len(sibling.name),
+                                                                    'role': 'R',
+                                                                    'pos': 'ADP'}
                         if sibling.name in ['of', 'to', 'from']:
                             for reg in PlaceQuestionParseTree.complex_spatial_propositions:
                                 pattern = reg + sibling.name
                                 regex_search = re.search(pattern, self.root.name)
                                 if regex_search is not None:
-                                    compound_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0], 'end': regex_search.regs[0][1]}
+                                    compound_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0],
+                                                                                                                             'end': regex_search.regs[0][1],
+                                                                                                                             'role': 'R',
+                                                                                                                             'pos': 'ADP'
+                                                                                                                             }
                                     self.label_complex_spatial_relationships(sibling, pattern)
                     named_object.parent.role = 'LOCATION'
         return compound_relationships
@@ -301,7 +307,10 @@ class PlaceQuestionParseTree:
                 if all_objects:
                     parent.role = 'o'
                     parent.children = []
-                    res[parent.name] = {'start':self.root.name.index(parent.name), 'end':self.root.name.index(parent.name)+len(parent.name)}
+                    res[parent.name] = {'start':self.root.name.index(parent.name),
+                                        'end':self.root.name.index(parent.name)+len(parent.name),
+                                        'role': 'o',
+                                        'pos': 'NOUN'}
         return res
 
     def get_verbs(self):
@@ -395,7 +404,9 @@ class PlaceQuestionParseTree:
                         num.parent.role = 'MEASURE'
                     if num.name+' '+sibling.name in self.root.name:
                         units[num.name+' '+sibling.name] = {'start':self.root.name.index(num.name+' '+sibling.name),
-                                                            'end': self.root.name.index(num.name+' '+sibling.name )+len(num.name+' '+sibling.name )}
+                                                            'end': self.root.name.index(num.name+' '+sibling.name )+len(num.name+' '+sibling.name ),
+                                                            'role': 'n',
+                                                            'pos': 'NUM'}
                         added = True
             if not added and num.parent.nodeType == 'QP' and num.parent.parent is not None:
                 found = False
@@ -407,25 +418,28 @@ class PlaceQuestionParseTree:
                         num.parent = new_node
                         child.parent = new_node
                         units[new_node.name] = {'start': self.root.name.index(new_node.name),
-                                                'end': self.root.name.index(new_node.name) + len(new_node.name)}
+                                                'end': self.root.name.index(new_node.name) + len(new_node.name),
+                                                'role': 'n',
+                                                'pos': 'NUM'
+                                                }
         return units
 
     def label_qualities(self):
-        compounds = []
+        compounds = {}
         adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('AD'))
         for adj in adjectives:
             if len(search.findall(adj, filter_= lambda node: node.nodeType in ['CC', 'NP', 'NNS', 'NN'])) == 0:
                 res = PlaceQuestionParseTree.label_adjective_roles(adj)
-                compounds.extend(res)
+                compounds = {**compounds, **res}
         other_adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('J') and node.parent.role == '')
         for adj in other_adjectives:
             res = PlaceQuestionParseTree.label_adjective_roles(adj)
-            compounds.extend(res)
+            compounds = {**compounds, **res}
         return compounds
 
     @staticmethod
     def label_adjective_roles(adj):
-        compounds = []
+        compounds = {}
         found = False
         for child in adj.parent.children:
             if child == adj:
@@ -437,25 +451,26 @@ class PlaceQuestionParseTree:
                     adj.role = 'Q'
                 else:
                     print('unresolved adjective! ' + adj.name + ' ' + child.name)
-                if ' ' in adj.name:
-                    compounds.append(adj.name)
+                # if ' ' in adj.name:
+                compounds[adj.name] = {'start': adj.spans['start'],
+                                      'end': adj.spans['end'],
+                                       'role':adj.role, 'pos':'ADJ'}
                 break
             elif found and child.nodeType in['PP', 'IN']:
                 if child.nodeType == 'IN':
                     adj.parent = None
                     child.name = adj.name+' '+child.name
-                    compounds.append(child.name)
                 elif child.nodeType == 'PP' and child.children[0].nodeType == 'IN':
                     if len(adj.parent.children) == 2:
                         child.parent = adj.parent
                         child.name = adj.name + ' '+ child.name
                         adj.parent = None
                         child.children[0].name = adj.name+' '+child.children[0].name
-                        compounds.append(child.children[0].name)
+                        # compounds.append(child.children[0].name)
                     else:
                         adj.parent = None
                         child.children[0].name = adj.name + ' ' + child.children[0].name
-                        compounds.append(child.children[0].name)
+                        # compounds.append(child.children[0].name)
                 else:
                     print('unresolved adjective '+ adj.name + ' ' + child.name)
         return compounds
@@ -671,10 +686,11 @@ class PlaceDependencyTree:
                         for child in node.children:
                             children.append(child)
                 selected.name = k
+                selected.role = v['role']
+                selected.attributes = [v['pos']]
             for child in children:
                 if child.parent is not None:
                     child.parent = selected
-
 
     def detect_conjunctions(self):
         conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
