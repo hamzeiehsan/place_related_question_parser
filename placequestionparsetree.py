@@ -54,16 +54,11 @@ class PlaceQuestionParseTree:
 
     def label_tree(self):
         self.clean_tree()
-        self.label_conjunctions()
-
-        #self.label_spatiotemporal_relationships()
-        #self.clean_locations()
-        #self.update()
-
-        res = self.label_non_platial_objects()
-        res2 = self.label_numbers()
+        res = self.label_conjunctions()
+        res = {**res, **self.label_non_platial_objects()}
+        res = {**res, **self.label_numbers()}
         self.update()
-        return {**res, **res2}
+        return res
 
     def find_node_by_exact_name(self, string):
         return search.findall_by_attr(self.root, string)
@@ -80,7 +75,6 @@ class PlaceQuestionParseTree:
             nodes[0].role = role
             if clean:
                 nodes[0].children = []
-            return True
         else:
             min_depth = 1000
             selected = None
@@ -98,11 +92,6 @@ class PlaceQuestionParseTree:
                 elif not question_words and not comparison:
                     selected.nodeType = 'NP'
                 selected.role = role
-                # if node.nodeType.startswith("N"):
-                #     node.role = role
-                #     if clean:
-                #         node.children = []
-        return False
 
     def clean_tree(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("E", "P", "e", "p", "d", "o"))
@@ -115,33 +104,57 @@ class PlaceQuestionParseTree:
 
     def label_spatiotemporal_relationships(self):
         named_objects = search.findall(self.root, filter_=lambda node: node.role in ("P", "p", "d"))
-        compound_relationships = {}
+        res_relationships = {}
         for named_object in named_objects:
             for sibling in named_object.siblings:
                 if sibling.nodeType == 'IN' and named_object.parent.nodeType in ['PP', 'VP'] and\
                         sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
                     if named_object.role == 'd':
                         sibling.role = 'r'
+                        if sibling.name in res_relationships.keys():
+                            res_relationships[sibling.name]['start'] = \
+                                min(res_relationships[sibling.name]['start'], sibling.spans['start'])
+                            res_relationships[sibling.name]['end'] = max(
+                                res_relationships[sibling.name]['end'], sibling.spans['end'])
+                        else:
+                            res_relationships[sibling.name] = {'start': sibling.spans['start'],
+                                                               'end': sibling.spans['end'],
+                                                               'role': 'r', 'pos': 'ADP'}
                     else: # complex spatial relationship with ['of', 'from', 'to']
                         sibling.role = 'R'
-                        if ' ' in sibling.name:
-                            compound_relationships[sibling.name] = {'start': self.root.name.index(sibling.name),
-                                                                    'end': self.root.name.index(sibling.name) + len(sibling.name),
-                                                                    'role': 'R',
-                                                                    'pos': 'ADP'}
                         if sibling.name in ['of', 'to', 'from']:
                             for reg in PlaceQuestionParseTree.complex_spatial_propositions:
                                 pattern = reg + sibling.name
                                 regex_search = re.search(pattern, self.root.name)
                                 if regex_search is not None:
-                                    compound_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0],
+                                    res_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0],
                                                                                                                              'end': regex_search.regs[0][1],
                                                                                                                              'role': 'R',
                                                                                                                              'pos': 'ADP'
                                                                                                                              }
                                     self.label_complex_spatial_relationships(sibling, pattern)
+                                else:
+                                    if sibling.name in res_relationships.keys():
+                                        res_relationships[sibling.name]['start'] = \
+                                            min(res_relationships[sibling.name]['start'], sibling.spans['start'])
+                                        res_relationships[sibling.name]['end'] = max(
+                                            res_relationships[sibling.name]['end'], sibling.spans['end'])
+                                    else:
+                                        res_relationships[sibling.name] = {'start': sibling.spans['start'],
+                                                                           'end': sibling.spans['end'],
+                                                                           'role': 'R', 'pos': 'ADP'}
+                        else:
+                            if sibling.name in res_relationships.keys():
+                                res_relationships[sibling.name]['start'] = \
+                                    min(res_relationships[sibling.name]['start'], sibling.spans['start'])
+                                res_relationships[sibling.name]['end'] = max(
+                                    res_relationships[sibling.name]['end'], sibling.spans['end'])
+                            else:
+                                res_relationships[sibling.name] = {'start': sibling.spans['start'],
+                                                                   'end': sibling.spans['end'], 'role': 'R',
+                                                                   'pos': 'ADP'}
                     named_object.parent.role = 'LOCATION'
-        return compound_relationships
+        return res_relationships
 
     def label_complex_spatial_relationships(self, prep, pattern):
         matched = False
@@ -263,10 +276,14 @@ class PlaceQuestionParseTree:
     @staticmethod
     def merge(node1, node2, order=True):
         node = None
+        start = min(node1.spans['start'], node2.spans['start'])
+        end = max(node1.spans['end'], node2.spans['end'])
         if order:
-            node = AnyNode(name=node1.name + ' ' + node2.name, nodeType=node1.nodeType, role=node1.role)
+            node = AnyNode(name=node1.name + ' ' + node2.name, nodeType=node1.nodeType, role=node1.role,
+                           spans={'start': start, 'end': end})
         else:
-            node = AnyNode(name=node2.name + ' ' + node1.name, nodeType=node1.nodeType, role=node1.role)
+            node = AnyNode(name=node2.name + ' ' + node1.name, nodeType=node1.nodeType, role=node1.role,
+                           spans={'start': start, 'end': end})
         node.parent = node1.parent
         if order:
             node1.parent = node
@@ -307,8 +324,13 @@ class PlaceQuestionParseTree:
                 if all_objects:
                     parent.role = 'o'
                     parent.children = []
-                    res[parent.name] = {'start':self.root.name.index(parent.name),
-                                        'end':self.root.name.index(parent.name)+len(parent.name),
+                    res[parent.name] = {'start': parent.spans['start'],
+                                        'end':parent.spans['end'],
+                                        'role': 'o',
+                                        'pos': 'NOUN'}
+                else:
+                    res[npo.name] = {'start': npo.spans['start'],
+                                        'end': npo.spans['end'],
                                         'role': 'o',
                                         'pos': 'NOUN'}
         return res
@@ -322,12 +344,15 @@ class PlaceQuestionParseTree:
         return verbs
 
     def label_situation_activities(self, verbs, decisions):
+        res = {}
         verb_nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("VB") and node.name in verbs)
         for i in range(len(verbs)):
             node = verb_nodes[i]
             decision = decisions[i]
             if decision != 'u':
                 node.role = decision
+                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'],
+                                  'role': node.role, 'pos': 'VERB'}
             else:
                 print("this verb is suspicious: " + str(node.name))
         situations = search.findall(self.root, filter_=lambda  node: node.role == 's')
@@ -343,6 +368,7 @@ class PlaceQuestionParseTree:
                 if sibiling.role == '' and sibiling.nodeType == 'PP':
                     if len(search.findall(sibiling, filter_=lambda node: node.role in ('o'))) > 0:
                         sibiling.role = 'a'
+        return res
 
     def label_events_actions(self):
         nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("V") and 'P' in node.nodeType and
@@ -367,15 +393,22 @@ class PlaceQuestionParseTree:
             node.role = 'n'
 
     def label_conjunctions(self):
+        res = {}
         nodes = search.findall(self.root, filter_=lambda node: node.nodeType in ('CC', 'IN', 'SCONJ', 'CCONJ')
                                                                and node.role == '' and len(node.children) == 0)
         for node in nodes:
             if node.name in ['and', 'both']:
                 node.role = '&'
+                res[node.name] = {'start':node.spans['start'], 'end': node.spans['end'], 'role': node.role,
+                                  'pos':'CCONJ'}
             elif node.name in ['or', 'whether']:
                 node.role = '|'
+                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'], 'role': node.role,
+                                  'pos': 'CCONJ'}
             elif node.name in ['not', 'neither', 'nor', 'but', 'except']:
                 node.role = '!'
+                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'], 'role': node.role,
+                                  'pos': 'SCONJ'}
 
             siblings = search.findall(node.parent, filter_=lambda node: node.role not in ('&', '|', '!', 'q') and
                                       node.nodeType != 'DT' and (node.role != '' or node.nodeType == ','))
@@ -383,11 +416,14 @@ class PlaceQuestionParseTree:
             for sibling in siblings:
                 if sibling.nodeType == ',':
                     sibling.role = node.role
+                    res[sibling.name] = {'start': sibling.spans['start'], 'end': sibling.spans['end'],
+                                         'role': sibling.role, 'pos': res[node.name]['pos']}
                 else:
                     sibling_roles.add(sibling.role)
             if len(sibling_roles) == 1:
                 node.parent.role = list(sibling_roles)[0]
         self.update()
+        return res
 
     def label_numbers(self):
         numbers = search.findall(self.root, filter_= lambda node: node.role == '' and node.nodeType == 'CD')
@@ -403,8 +439,8 @@ class PlaceQuestionParseTree:
                     if num.parent.role == '':
                         num.parent.role = 'MEASURE'
                     if num.name+' '+sibling.name in self.root.name:
-                        units[num.name+' '+sibling.name] = {'start':self.root.name.index(num.name+' '+sibling.name),
-                                                            'end': self.root.name.index(num.name+' '+sibling.name )+len(num.name+' '+sibling.name ),
+                        units[num.name+' '+sibling.name] = {'start':num.spans['start'],
+                                                            'end': sibling.spans['end']+1,
                                                             'role': 'n',
                                                             'pos': 'NUM'}
                         added = True
@@ -414,14 +450,25 @@ class PlaceQuestionParseTree:
                     if child == num.parent:
                         found = True
                     elif found and child.name in PlaceDependencyTree.UNITS:
-                        new_node = AnyNode(child.parent, role='MESAURE', name=num.name + ' ' + child.name, nodeType='NP')
+                        new_node = AnyNode(child.parent, role='MESAURE', name=num.name + ' ' + child.name,
+                                           nodeType='NP', spans= {
+                                'start': self.root.name.index(num.name + ' ' + child.name),
+                                'end': self.root.name.index(num.name + ' ' + child.name)+
+                                       len(num.name + ' ' + child.name)
+                            })
                         num.parent = new_node
                         child.parent = new_node
-                        units[new_node.name] = {'start': self.root.name.index(new_node.name),
-                                                'end': self.root.name.index(new_node.name) + len(new_node.name),
+                        units[new_node.name] = {'start': new_node.spans['start'],
+                                                'end': new_node.spans['end'],
                                                 'role': 'n',
                                                 'pos': 'NUM'
                                                 }
+            else:
+                units[num.name] = {'start': num.spans['start'],
+                                        'end': num.spans['end'],
+                                        'role': 'n',
+                                        'pos': 'NUM'
+                                        }
         return units
 
     def label_qualities(self):
@@ -466,11 +513,9 @@ class PlaceQuestionParseTree:
                         child.name = adj.name + ' '+ child.name
                         adj.parent = None
                         child.children[0].name = adj.name+' '+child.children[0].name
-                        # compounds.append(child.children[0].name)
                     else:
                         adj.parent = None
                         child.children[0].name = adj.name + ' ' + child.children[0].name
-                        # compounds.append(child.children[0].name)
                 else:
                     print('unresolved adjective '+ adj.name + ' ' + child.name)
         return compounds
@@ -625,6 +670,7 @@ class Dependency:
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
      'km', 'm', 'mi', 'yard', 'hectare']
+
     def __init__(self, dependency_dict):
         self.dict = dependency_dict
         self.root = None
@@ -634,7 +680,7 @@ class PlaceDependencyTree:
 
     def construct_dependencies(self):
         root = AnyNode(name=self.dict['word'], nodeType=self.dict['nodeType'],
-                       attributes=self.dict['attributes'], spans=self.dict['spans'], link=self.dict['link'])
+                       attributes=self.dict['attributes'], spans=self.dict['spans'], link=self.dict['link'], role='')
         if 'children' in self.dict.keys():
             for child in self.dict['children']:
                 self.add_to_tree(child, root)
@@ -644,7 +690,7 @@ class PlaceDependencyTree:
     def add_to_tree(self, node, parent):
         n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent,
                     attributes=node['attributes'], spans=node['spans'],
-                    link=node['link'])
+                    link=node['link'], role='')
         if 'children' in node.keys():
             for child in node['children']:
                 self.add_to_tree(child, n)
@@ -657,7 +703,7 @@ class PlaceDependencyTree:
             return "Empty Tree"
         res = ""
         for pre, fill, node in self.tree:
-            res+="%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.attributes)+"\n"
+            res+="%s%s (%s) {%s} [%s]" % (pre, node.name, node.nodeType, node.attributes, node.role)+"\n"
         return res
 
     def detect_dependencies(self):
@@ -829,8 +875,6 @@ class PlaceDependencyTree:
                 dep = Dependency(first, relation, second)
                 self.dependencies.append(dep)
 
-
-
     def detect_complex_prepositions(self):
         preps = search.findall(self.root, filter_=lambda node: node.link == 'prep')
         for prep in preps:
@@ -854,7 +898,6 @@ class PlaceDependencyTree:
                     second = PlaceDependencyTree.clone_node_without_children(modifiers[0])
                     dep = Dependency(first, relation, second)
                     self.dependencies.append(dep)
-
 
     @staticmethod
     def find_first_parent_based_on_attribute(node, attributes):

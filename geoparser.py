@@ -239,75 +239,88 @@ def analyze(questions):
         # construct and constituency tree dependency tree
         tree = CPARSER.construct_tree(question)
 
-        logging.info('tree:\n' + str(tree))
-        multi_words = {}
+        logging.debug('initial constituency tree:\n' + str(tree))
+        labelled = {}
         for k, v in ENCODINGS.items():
             if k in result.keys():
                 for item in result[k]:
                     tree.label_role(item, v, clean=True)
-                    if len(item.split(' ')) > 1:
-                        if item not in question:
-                            string = item.replace(" 's", "'s")
-                            if string in question:
-                                multi_words[item] = {'start': question.index(string),
-                                                     'end': question.index(string) + len(string),
-                                                     'role': v,
-                                                     'pos': 'NOUN'}
+                    if item not in question:
+                        string = item.replace(" 's", "'s")
+                        if string in question:
+                            labelled[item] = {'start': question.index(string),
+                                              'end': question.index(string) + len(string),
+                                              'role': v,
+                                              'pos': 'NOUN'}
+                    else:
+                        if question.count(item) > 1:
+                            labelled[item] = {'start': question.index(item),
+                                              'end': question.rindex(item)+len(item),
+                                              'role': v,
+                                              'pos': 'NOUN'}
                         else:
-                            multi_words[item] = {'start': question.index(item), 'end': question.index(item) + len(item),
-                                                 'role': v,
-                                                 'pos': 'NOUN'}
+                            labelled[item] = {'start': question.index(item), 'end': question.index(item) + len(item),
+                                          'role': v,
+                                          'pos': 'NOUN'}
 
-        multi_words = {**multi_words, **tree.label_tree()}
+        labelled = {**labelled, **tree.label_tree()}
         for k, v in PRONOUN.items():
             if question.startswith(k + ' '):
                 tree.label_role(k, v, question_words=True)
+                labelled[k] = {'start': question.index(k), 'end': question.index(k)+len(k), 'role': v, 'pos': 'ADV'}
         compound_qw = find_compound_question_words(question)
         for qw in compound_qw.keys():
             role = ''
             if qw in COMPOUNDS_QW_ROLE.keys():
                 role = COMPOUNDS_QW_ROLE[qw]
             tree.label_role(qw, role, clean=True, question_words=True)
-        multi_words = {**multi_words, **compound_qw}
+        labelled = {**labelled, **compound_qw}
 
         verbs = tree.get_verbs()
         decisions = Embedding.verb_encoding(tree.root.name, verbs)
-        tree.label_situation_activities(verbs=verbs, decisions=decisions)
+        labelled = {**labelled, **tree.label_situation_activities(verbs=verbs, decisions=decisions)}
         tree.label_events_actions()
-        multi_words = {**multi_words, **tree.label_qualities()}
+        labelled = {**labelled, **tree.label_qualities()}
         tree.clean_single_child()
         tree.clean_tree()
 
-        multi_words = {**multi_words, **tree.label_spatiotemporal_relationships()}
+        labelled = {**labelled, **tree.label_spatiotemporal_relationships()}
 
         for c, v in COMPARISON.items():
             if c in question:
                 tree.label_role(c, v, comparison=True)
-                multi_words[c] = {'start': question.index(c), 'end': question.index(c) + len(c), 'role': v, 'pos': 'ADJ'}
+                labelled[c] = {'start': question.index(c), 'end': question.index(c) + len(c), 'role': v, 'pos': 'ADJ'}
         for creg, c in COMPARISON_REGEX.items():
             reg_search = re.search(creg, question)
             if reg_search is not None:
                 tree.label_complex_comparison(reg_search, c, COMPARISON[c])
-                multi_words[c] = {'start': reg_search.regs[0][0], 'end': reg_search.regs[0][1], 'role': COMPARISON[c],
+                labelled[c] = {'start': reg_search.regs[0][0], 'end': reg_search.regs[0][1], 'role': COMPARISON[c],
                                 'pos': 'ADJ'}
 
         tree.label_events_actions()
         tree.clean_single_child()
-        logging.info('tree:\n' + str(tree))
+        logging.info('constituency tree:\n' + str(tree))
+        logging.info('encoded elements:\n' + str(labelled))
 
-        # construct dependency tree, cleaning and extract dependencies
+        # construct dependency tree, cleaning
         d_tree = DPARSER.construct_tree(question)
-        print(multi_words)
-        d_tree.clean_d_tree(multi_words)
+        logging.debug('initial dependency tree:\n' + str(d_tree))
 
-        print(d_tree)
-        d_tree.detect_dependencies()
-        print(d_tree.dependencies)
+        d_tree.clean_d_tree(labelled)
+        logging.info('refined dependency tree:\n'+str(d_tree))
 
-        # update constituency tree with dependencies
-        # tree.apply_dependencies(d_tree.dependencies)
-        # print('tree:\n' + str(tree))
-        print(result)
+        # refine mistakes in constituency parsing
+        # todo
+
+        # intent recognition
+        # todo
+
+        # use DependencyDetector to detect dependencies inside both parsing trees
+        # generate FOL statements based on deps (FOLGenerator class)
+        # todo
+
+        # generate GeoSPARQL queries from FOL statements (deps)
+        # todo
 
 
 analyze(questions)
