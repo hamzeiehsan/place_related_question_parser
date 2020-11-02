@@ -1,4 +1,5 @@
 from ner import NER, CPARSER, Embedding, DPARSER
+from placequestionparsetree import FOLGenerator
 import re
 
 import logging
@@ -6,8 +7,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there', 'In which']
-COMPOUNDS_QW_ROLE = {'How many':6, 'Are there':'8', 'Is there':'8', 'In which': '3', 'In what': '2'}
+COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there', 'In which', 'In what',
+                'Through which', 'Through what']
+COMPOUNDS_QW_ROLE = {'How many':'6', 'Are there':'8', 'Is there':'8', 'In which': '3', 'In what': '2',
+                     'Through which': '3', 'Through what': '2'}
 
 
 
@@ -48,6 +51,7 @@ def load_dataset(path):
 
 def load_dummy_dataset():
     questions = []
+    questions.append("In what county is Stonehenge located")
     questions.append("Which museums are within 3km of Saint George's Hotel in London?")
     questions.append("Which provinces of Ireland have population over 2000000?")
     questions.append("What is the population density of cities that are affected by the hurricanes in the USA in the last century")
@@ -227,7 +231,7 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
 questions = load_dataset('data/datasets/GeoQuestion201.csv')
-# questions = load_dummy_dataset()
+questions = load_dummy_dataset()
 
 
 def analyze(questions):
@@ -241,6 +245,18 @@ def analyze(questions):
 
         logging.debug('initial constituency tree:\n' + str(tree))
         labelled = {}
+        for k, v in PRONOUN.items():
+            if question.startswith(k + ' '):
+                tree.label_role(k, v, question_words=True)
+                labelled[k] = {'start': question.index(k), 'end': question.index(k)+len(k), 'role': v, 'pos': 'ADV'}
+        compound_qw = find_compound_question_words(question)
+        for qw in compound_qw.keys():
+            role = ''
+            if qw in COMPOUNDS_QW_ROLE.keys():
+                role = COMPOUNDS_QW_ROLE[qw]
+            tree.label_role(qw, role, clean=True, question_words=True)
+        labelled = {**labelled, **compound_qw}
+
         for k, v in ENCODINGS.items():
             if k in result.keys():
                 for item in result[k]:
@@ -264,17 +280,6 @@ def analyze(questions):
                                           'pos': 'NOUN'}
 
         labelled = {**labelled, **tree.label_tree()}
-        for k, v in PRONOUN.items():
-            if question.startswith(k + ' '):
-                tree.label_role(k, v, question_words=True)
-                labelled[k] = {'start': question.index(k), 'end': question.index(k)+len(k), 'role': v, 'pos': 'ADV'}
-        compound_qw = find_compound_question_words(question)
-        for qw in compound_qw.keys():
-            role = ''
-            if qw in COMPOUNDS_QW_ROLE.keys():
-                role = COMPOUNDS_QW_ROLE[qw]
-            tree.label_role(qw, role, clean=True, question_words=True)
-        labelled = {**labelled, **compound_qw}
 
         verbs = tree.get_verbs()
         decisions = Embedding.verb_encoding(tree.root.name, verbs)
@@ -309,15 +314,15 @@ def analyze(questions):
         d_tree.clean_d_tree(labelled)
         logging.info('refined dependency tree:\n'+str(d_tree))
 
-        # refine mistakes in constituency parsing
-        # todo
-
+        # use FOLGenerator to detect dependencies inside both parsing trees
         # intent recognition
         # todo
-
-        # use DependencyDetector to detect dependencies inside both parsing trees
+        fol = FOLGenerator(cons_tree=tree, dep_tree=d_tree)
+        fol.generate_dependencies()
         # generate FOL statements based on deps (FOLGenerator class)
         # todo
+
+        fol.print_dependencies()
 
         # generate GeoSPARQL queries from FOL statements (deps)
         # todo

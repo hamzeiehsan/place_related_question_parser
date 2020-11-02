@@ -73,6 +73,8 @@ class PlaceQuestionParseTree:
         nodes = self.find_node_by_name(name)
         if len(nodes) == 1:
             nodes[0].role = role
+            if question_words:
+                nodes[0].nodeType = 'WH'
             if clean:
                 nodes[0].children = []
         else:
@@ -85,7 +87,7 @@ class PlaceQuestionParseTree:
                 else:
                     node.parent = None
                 selected.name = name
-                if question_words and self.root.name.startswith(name):
+                if question_words:
                     selected.nodeType = 'WH'
                 elif comparison:
                     selected.nodeType = 'JJR'
@@ -98,6 +100,7 @@ class PlaceQuestionParseTree:
         for named_object in named_objects:
             if len(named_object.siblings) == 1 and (named_object.siblings[0].nodeType == 'DT'):
                 named_object.parent.role = named_object.role
+                named_object.parent.nodeType = named_object.nodeType
                 named_object.parent.children = []
             elif len(named_object.siblings) == 1 and named_object.siblings[0].role == named_object.role:
                 named_object.parent.role = named_object.role
@@ -667,6 +670,80 @@ class Dependency:
         return string
 
 
+class FOLGenerator:
+    def __init__(self, cons_tree, dep_tree):
+        self.cons = cons_tree
+        self.dep = dep_tree
+        self.dependencies = {}
+
+    def generate_dependencies(self):
+        res = {}
+        res['intent'] = self.extract_intent_dependency()
+        res['criteria'] = []
+        self.dependencies = res
+
+    def extract_intent_dependency(self):
+        question_words = search.findall(self.cons.root, filter_= lambda node: node.nodeType == 'WH')
+        selected = None
+        if len(question_words) > 1:
+            min_start = 1000
+            for node in question_words:
+                if node.spans['start'] < min_start:
+                    min_start = node.spans['start']
+                    selected = node
+        elif len(question_words) == 1:
+            selected = question_words[0]
+        else:
+            return None
+        first = PlaceDependencyTree.clone_node_without_children(selected, cons_tree=True)
+        if selected.role == '8':
+            relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
+            intent = Dependency(node1=first, relation=relation)
+            return intent
+
+        seconds = search.findall(self.cons.root, filter_=lambda node: node.role in ['o', 'p',
+                                                                                     'ACTION', 'EVENT', 'SITUATION'])
+        what = None
+        if len(seconds) == 0:
+            seconds = search.findall(self.cons.root, filter_=lambda node: node.role == 'P')
+
+        if len(seconds) == 1:
+            what = seconds[0]
+        else:
+            max_depth = -1
+            min_start = 1000
+            for second in seconds:
+                if second.spans['start'] < min_start:
+                    if second.role == 'P' and (selected.nodeType.startswith('WH') or
+                                               second.parent.nodeType != 'PP'):
+                        continue
+                    else:
+                        what = second
+                        min_start = second.spans['start']
+                        max_depth = second.depth
+                elif second.spans['start'] == min_start and second.depth > max_depth:
+                    what = second
+                    max_depth = second.depth
+        if what is None:
+            what = seconds[0]
+        second = PlaceDependencyTree.clone_node_without_children(what, cons_tree=True)
+        if selected.role == '1':  # where questions
+            relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='LOCATION', nodeType='RELATION')
+        elif selected.role == '6': # how many
+            relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='COUNT', nodeType='RELATION')
+        else:
+            if ' ' in first.name:
+                first.name = first.name.split()[1]
+            relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link=first.name.upper(), nodeType='RELATION')
+        intent = Dependency(node1=first, relation=relation, node2=second)
+        return intent
+
+    def print_dependencies(self):
+        for k, v in self.dependencies.items():
+            print(k)
+            print('value: \n'+str(v))
+
+
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
      'km', 'm', 'mi', 'yard', 'hectare']
@@ -912,13 +989,16 @@ class PlaceDependencyTree:
         return first_parent
 
     @staticmethod
-    def clone_node_without_children(node, override={}):
+    def clone_node_without_children(node, override={}, cons_tree=False):
         if len(override) == 0:
+            if cons_tree:
+                return AnyNode(name=node.name, spans=node.spans, attributes=[node.nodeType],
+                               link='', nodeType=node.nodeType, role=node.role)
             return AnyNode(name=node.name, spans=node.spans, attributes=node.attributes,
-                       link=node.link, nodeType=node.nodeType)
+                       link=node.link, nodeType=node.nodeType, role=node.role)
         else:
             return AnyNode(name=node.name, spans=node.spans, attributes=override['attributes'],
-                           link=override['link'], nodeType=override['nodeType'])
+                           link=override['link'], nodeType=override['nodeType'], role=node.role)
 
     def print_dependencies(self):
         for dep in self.dependencies:
