@@ -774,6 +774,7 @@ class FOLGenerator:
     def extract_spatiotemporal_relationships(self):
         locations = search.findall(self.cons.root, filter_=lambda node: node.role == 'LOCATION')
         for location in locations:
+            done = False
             relationships = search.findall(location, filter_=lambda node: node.parent == location and
                                           node.role in ['R', 'r'])
             anchors = search.findall(location, filter_=lambda node: node.role in ['p', 'P', 'd'])
@@ -837,6 +838,7 @@ class FOLGenerator:
                     for anchor in anchors:
                         second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
                         self.dependencies['criteria'].append(Dependency(first, relation, second))
+                        done = True
                         if len(locations) > 1:
                             break
                 else:
@@ -846,6 +848,7 @@ class FOLGenerator:
                         for anchor in anchors:
                             second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
                             self.dependencies['criteria'].append(Dependency(first, relation, second))
+                            done = True
                             if len(locations) > 1:
                                 break
                     else:
@@ -858,8 +861,20 @@ class FOLGenerator:
                                 for anchor in anchors:
                                     second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
                                     self.dependencies['criteria'].append(Dependency(first, relation, second))
+                                    done = True
                                     if len(locations) > 1:
                                         break
+            if done:
+                if len(relationship.children) > 0:
+                    measures = search.findall(relationship, filter_= lambda node: node.role == 'MEASURE')
+                    if len(measures) == 1:
+                        measure = measures[0]
+                        first = PlaceDependencyTree.clone_node_without_children(r_node)
+                        relation = AnyNode(name='MEASURE', spans=[{}], attributes=None, link='ARGUMENT',
+                                           nodeType='RELATION')
+                        second = PlaceDependencyTree.clone_node_without_children(measure, cons_tree=True)
+                        self.dependencies['criteria'].append(Dependency(first, relation, second))
+
 
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',

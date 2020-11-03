@@ -83,6 +83,7 @@ def load_dummy_dataset():
     questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and "
                      "St. John the Baptist church?")
     questions.append("What is the most populated city in the United Kingdom except London?")
+    questions.append("Which museums are within 3km of Saint George's Hotel in London?")
 
     return questions
 
@@ -264,8 +265,8 @@ countries = load_word(fcountries)
 Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
-# questions = load_dataset('data/datasets/GeoQuestion201.csv')
-questions = load_dummy_dataset()
+questions = load_dataset('data/datasets/GeoQuestion201.csv')
+questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 
 def analyze(questions):
@@ -346,6 +347,10 @@ def analyze(questions):
         fol.generate_dependencies()
 
         fol.print_dependencies()
+
+        # print FOL statements
+        # todo define variables (p, e, o); implicit (where - situations/activities);
+        #  define properties and constants; define relationships
 
         # generate GeoSPARQL queries from FOL statements (deps)
         # todo
