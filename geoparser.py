@@ -76,8 +76,13 @@ def load_dummy_dataset():
     # questions.append("Which hospital is nearest to Calton Hill in Edinburgh?")
     # questions.append("Which city of England is nearest to London?")
     # questions.append("What is the name of the river that flows under the Queensway Bridge in Liverpool?")
-    questions.append("Which county is east of county Dorset?")
-
+    questions.append("Which cities or towns of the United Kingdom have a university?")
+    questions.append("What is the longest river in England and Wales?")
+    questions.append("What is the distance between Liverpool and Glasgow?")
+    questions.append("Are there any rivers that cross both England and Wales?")
+    questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and "
+                     "St. John the Baptist church?")
+    questions.append("What is the most populated city in the United Kingdom except London?")
 
     return questions
 
@@ -259,8 +264,8 @@ countries = load_word(fcountries)
 Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
-questions = load_dataset('data/datasets/GeoQuestion201.csv')
-# questions = load_dummy_dataset()
+# questions = load_dataset('data/datasets/GeoQuestion201.csv')
+questions = load_dummy_dataset()
 
 
 def analyze(questions):

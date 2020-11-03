@@ -504,7 +504,7 @@ class PlaceQuestionParseTree:
                     adj.parent = None
                     child.name = adj.name+' '+child.name
                 elif child.nodeType == 'PP' and child.children[0].nodeType == 'IN':
-                    if len(adj.parent.children) == 2:
+                    if adj.parent is not None and len(adj.parent.children) == 2:
                         child.parent = adj.parent
                         child.name = adj.name + ' '+ child.name
                         child.spans = {'start':adj.spans['start'], 'end':child.spans['end']}
@@ -674,7 +674,8 @@ class FOLGenerator:
 
     def generate_dependencies(self):
         self.dependencies['intent'] = self.extract_intent_dependency()
-        self.dependencies['criteria'] = []
+        self.dependencies['criteria'] = []  # order -- conjunction, spatial relationships, qualities, comparison
+        self.extract_conjunctions()
         self.extract_spatiotemporal_relationships()
         return self.dependencies
 
@@ -738,6 +739,37 @@ class FOLGenerator:
         for k, v in self.dependencies.items():
             print(k)
             print('value: \n'+str(v))
+
+    def extract_conjunctions(self):
+        and_or = ['&', '|']
+        conjs = search.findall(self.cons.root, filter_= lambda node: node.role in and_or)
+        for conj in conjs:
+            siblings = search.findall(conj.parent, filter_= lambda node: node.parent == conj.parent and
+                           node.role in ['p', 'P', 'e', 'E'])
+            for s1 in siblings:
+                for s2 in siblings:
+                    if s1 != s2:
+                        first = PlaceDependencyTree.clone_node_without_children(s1, cons_tree=True)
+                        second = PlaceDependencyTree.clone_node_without_children(s2, cons_tree=True)
+                        relation = AnyNode(name=conj.name, spans=[{}], attributes=None, link=conj.name.upper(),
+                                           nodeType='RELATION')
+                        self.dependencies['criteria'].append(Dependency(first, relation, second))
+        not_nor = ['!']
+        negations = search.findall(self.cons.root, filter_= lambda node: node.role in not_nor)
+        for negation in negations:
+            next = search.findall(negation.parent, filter_= lambda node: node.parent == negation.parent and
+                                  node.spans['start'] > negation.spans['start'] and node.role in ['p', 'P', 'e', 'E'])
+            if len(next) > 0:
+                next = next[0]
+                d_conj = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == negation.name.strip())
+                if len(d_conj) == 1:
+                    d_conj = d_conj[0]
+                    if d_conj.parent.role in ['p', 'e']:
+                        first = PlaceDependencyTree.clone_node_without_children(d_conj.parent)
+                        second = PlaceDependencyTree.clone_node_without_children(next, cons_tree=True)
+                        relation = AnyNode(name=negation.name, spans=[{}], attributes=None, link=negation.name.upper(),
+                                           nodeType='RELATION')
+                        self.dependencies['criteria'].append(Dependency(first, relation, second))
 
     def extract_spatiotemporal_relationships(self):
         locations = search.findall(self.cons.root, filter_=lambda node: node.role == 'LOCATION')
@@ -817,8 +849,17 @@ class FOLGenerator:
                             if len(locations) > 1:
                                 break
                     else:
-                        print('WTF?')
-
+                        if len(r_node.children) > 0:
+                            filtered = search.findall(r_node.children[0], filter_= lambda node:
+                            node.role in ['p', 'P', 'e', 'E'] and node.name not in anchor_names)
+                            if len(filtered) == 1:
+                                first = PlaceDependencyTree.clone_node_without_children(filtered[0])
+                                relation = PlaceDependencyTree.clone_node_without_children(r_node)
+                                for anchor in anchors:
+                                    second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
+                                    self.dependencies['criteria'].append(Dependency(first, relation, second))
+                                    if len(locations) > 1:
+                                        break
 
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
