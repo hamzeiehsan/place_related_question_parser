@@ -87,6 +87,7 @@ class PlaceQuestionParseTree:
                 else:
                     node.parent = None
                 selected.name = name
+                selected.spans = {'start': self.root.name.index(name), 'end': self.root.name.index(name)+len(name)}
                 if question_words:
                     selected.nodeType = 'WH'
                 elif comparison:
@@ -114,15 +115,9 @@ class PlaceQuestionParseTree:
                         sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
                     if named_object.role == 'd':
                         sibling.role = 'r'
-                        if sibling.name in res_relationships.keys():
-                            res_relationships[sibling.name]['start'] = \
-                                min(res_relationships[sibling.name]['start'], sibling.spans['start'])
-                            res_relationships[sibling.name]['end'] = max(
-                                res_relationships[sibling.name]['end'], sibling.spans['end'])
-                        else:
-                            res_relationships[sibling.name] = {'start': sibling.spans['start'],
-                                                               'end': sibling.spans['end'],
-                                                               'role': 'r', 'pos': 'ADP'}
+                        if sibling.name + '--' + str(sibling.spans['start']) not in res_relationships.keys():
+                            res_relationships[sibling.name+'--'+str(sibling.spans['start'])] = {
+                                'start': sibling.spans['start'], 'end': sibling.spans['end'], 'role': 'r', 'pos': 'ADP'}
                     else: # complex spatial relationship with ['of', 'from', 'to']
                         sibling.role = 'R'
                         if sibling.name in ['of', 'to', 'from']:
@@ -130,32 +125,24 @@ class PlaceQuestionParseTree:
                                 pattern = reg + sibling.name
                                 regex_search = re.search(pattern, self.root.name)
                                 if regex_search is not None:
-                                    res_relationships[self.root.name[regex_search.regs[0][0]:regex_search.regs[0][1]]]={'start': regex_search.regs[0][0],
-                                                                                                                             'end': regex_search.regs[0][1],
-                                                                                                                             'role': 'R',
-                                                                                                                             'pos': 'ADP'
-                                                                                                                             }
+                                    res_relationships[self.root.name[
+                                                      regex_search.regs[0][0]:regex_search.regs[0][1]]
+                                    +'--'+str(regex_search.regs[0][0])]={'start': regex_search.regs[0][0],
+                                                                    'end': regex_search.regs[0][1],
+                                                                    'role': 'R',
+                                                                    'pos': 'ADP'}
                                     self.label_complex_spatial_relationships(sibling, pattern)
                                 else:
-                                    if sibling.name in res_relationships.keys():
-                                        res_relationships[sibling.name]['start'] = \
-                                            min(res_relationships[sibling.name]['start'], sibling.spans['start'])
-                                        res_relationships[sibling.name]['end'] = max(
-                                            res_relationships[sibling.name]['end'], sibling.spans['end'])
-                                    else:
-                                        res_relationships[sibling.name] = {'start': sibling.spans['start'],
+                                    if sibling.name + '--'+ str(sibling.spans['start']) not in res_relationships.keys():
+                                        res_relationships[sibling.name+'--'+str(sibling.spans['start'])
+                                                          ] = {'start': sibling.spans['start'],
                                                                            'end': sibling.spans['end'],
                                                                            'role': 'R', 'pos': 'ADP'}
                         else:
-                            if sibling.name in res_relationships.keys():
-                                res_relationships[sibling.name]['start'] = \
-                                    min(res_relationships[sibling.name]['start'], sibling.spans['start'])
-                                res_relationships[sibling.name]['end'] = max(
-                                    res_relationships[sibling.name]['end'], sibling.spans['end'])
-                            else:
-                                res_relationships[sibling.name] = {'start': sibling.spans['start'],
-                                                                   'end': sibling.spans['end'], 'role': 'R',
-                                                                   'pos': 'ADP'}
+                            if sibling.name + '--'+ str(sibling.spans['start']) not in res_relationships.keys():
+                                res_relationships[sibling.name+'--'+ str(sibling.spans['start'])
+                                                  ] = {'start': sibling.spans['start'],
+                                                       'end': sibling.spans['end'], 'role': 'R', 'pos': 'ADP'}
                     named_object.parent.role = 'LOCATION'
         return res_relationships
 
@@ -177,7 +164,8 @@ class PlaceQuestionParseTree:
                 context.role = 'R'
             else:
                 nodes = PlaceQuestionParseTree.iterate_and_find(context, text)
-                new_node = AnyNode(name=text, nodeType='IN', role='R')
+                new_node = AnyNode(name=text, nodeType='IN', role='R', spans={'start': nodes[0].spans['start'],
+                                                                              'end': nodes[len(nodes)-1].spans['end']})
                 before = []
                 after = []
 
@@ -246,6 +234,7 @@ class PlaceQuestionParseTree:
             second.parent.name = second.parent.name.replace(second.name, '').strip()
             second.parent = None
             first.parent.name = first.parent.name + ' '+second.name
+            first.parent.spans = {'start': first.parent.spans['start'], 'end': second.spans['end']}
         first.name = comparison
         first.role = role
 
@@ -327,14 +316,14 @@ class PlaceQuestionParseTree:
                 if all_objects:
                     parent.role = 'o'
                     parent.children = []
-                    res[parent.name] = {'start': parent.spans['start'],
+                    res[parent.name+'--'+str(parent.spans['start'])] = {'start': parent.spans['start'],
                                         'end':parent.spans['end'],
                                         'role': 'o',
                                         'pos': 'NOUN'}
                 else:
-                    res[npo.name] = {'start': npo.spans['start'],
+                    res[npo.name+'--'+str(npo.spans['start'])] = {'start': npo.spans['start'],
                                         'end': npo.spans['end'],
-                                        'role': 'o',
+                                        'role': npo.role,
                                         'pos': 'NOUN'}
         return res
 
@@ -354,7 +343,7 @@ class PlaceQuestionParseTree:
             decision = decisions[i]
             if decision != 'u':
                 node.role = decision
-                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'],
+                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'], 'end': node.spans['end'],
                                   'role': node.role, 'pos': 'VERB'}
             else:
                 print("this verb is suspicious: " + str(node.name))
@@ -402,16 +391,19 @@ class PlaceQuestionParseTree:
         for node in nodes:
             if node.name in ['and', 'both']:
                 node.role = '&'
-                res[node.name] = {'start':node.spans['start'], 'end': node.spans['end'], 'role': node.role,
-                                  'pos':'CCONJ'}
+                res[node.name+'--'+str(node.spans['start'])] = {'start':node.spans['start'],
+                                                                'end': node.spans['end'], 'role': node.role,
+                                                                'pos':'CCONJ'}
             elif node.name in ['or', 'whether']:
                 node.role = '|'
-                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'], 'role': node.role,
-                                  'pos': 'CCONJ'}
+                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                'end': node.spans['end'], 'role': node.role,
+                                                                'pos': 'CCONJ'}
             elif node.name in ['not', 'neither', 'nor', 'but', 'except']:
                 node.role = '!'
-                res[node.name] = {'start': node.spans['start'], 'end': node.spans['end'], 'role': node.role,
-                                  'pos': 'SCONJ'}
+                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                'end': node.spans['end'], 'role': node.role,
+                                                                'pos': 'SCONJ'}
 
             siblings = search.findall(node.parent, filter_=lambda node: node.role not in ('&', '|', '!', 'q') and
                                       node.nodeType != 'DT' and (node.role != '' or node.nodeType == ','))
@@ -419,8 +411,9 @@ class PlaceQuestionParseTree:
             for sibling in siblings:
                 if sibling.nodeType == ',':
                     sibling.role = node.role
-                    res[sibling.name] = {'start': sibling.spans['start'], 'end': sibling.spans['end'],
-                                         'role': sibling.role, 'pos': res[node.name]['pos']}
+                    res[sibling.name+'--'+str(sibling.spans['start'])] = {
+                        'start': sibling.spans['start'], 'end': sibling.spans['end'], 'role': sibling.role,
+                        'pos': res[node.name]['pos']}
                 else:
                     sibling_roles.add(sibling.role)
             if len(sibling_roles) == 1:
@@ -442,7 +435,7 @@ class PlaceQuestionParseTree:
                     if num.parent.role == '':
                         num.parent.role = 'MEASURE'
                     if num.name+' '+sibling.name in self.root.name:
-                        units[num.name+' '+sibling.name] = {'start':num.spans['start'],
+                        units[num.name+' '+sibling.name+'--'+str(num.spans['start'])] = {'start':num.spans['start'],
                                                             'end': sibling.spans['end']+1,
                                                             'role': 'n',
                                                             'pos': 'NUM'}
@@ -461,13 +454,13 @@ class PlaceQuestionParseTree:
                             })
                         num.parent = new_node
                         child.parent = new_node
-                        units[new_node.name] = {'start': new_node.spans['start'],
+                        units[new_node.name+'--'+str(new_node.spans['start'])] = {'start': new_node.spans['start'],
                                                 'end': new_node.spans['end'],
                                                 'role': 'n',
                                                 'pos': 'NUM'
                                                 }
             else:
-                units[num.name] = {'start': num.spans['start'],
+                units[num.name+'--'+str(num.spans['start'])] = {'start': num.spans['start'],
                                         'end': num.spans['end'],
                                         'role': 'n',
                                         'pos': 'NUM'
@@ -502,7 +495,7 @@ class PlaceQuestionParseTree:
                 else:
                     print('unresolved adjective! ' + adj.name + ' ' + child.name)
                 # if ' ' in adj.name:
-                compounds[adj.name] = {'start': adj.spans['start'],
+                compounds[adj.name+'--'+str(adj.spans['start'])] = {'start': adj.spans['start'],
                                       'end': adj.spans['end'],
                                        'role':adj.role, 'pos':'ADJ'}
                 break
@@ -514,11 +507,14 @@ class PlaceQuestionParseTree:
                     if len(adj.parent.children) == 2:
                         child.parent = adj.parent
                         child.name = adj.name + ' '+ child.name
+                        child.spans = {'start':adj.spans['start'], 'end':child.spans['end']}
                         adj.parent = None
                         child.children[0].name = adj.name+' '+child.children[0].name
+                        child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
                     else:
                         adj.parent = None
                         child.children[0].name = adj.name + ' ' + child.children[0].name
+                        child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
                 else:
                     print('unresolved adjective '+ adj.name + ' ' + child.name)
         return compounds
@@ -677,10 +673,10 @@ class FOLGenerator:
         self.dependencies = {}
 
     def generate_dependencies(self):
-        res = {}
-        res['intent'] = self.extract_intent_dependency()
-        res['criteria'] = []
-        self.dependencies = res
+        self.dependencies['intent'] = self.extract_intent_dependency()
+        self.dependencies['criteria'] = []
+        self.extract_spatiotemporal_relationships()
+        return self.dependencies
 
     def extract_intent_dependency(self):
         question_words = search.findall(self.cons.root, filter_= lambda node: node.nodeType == 'WH')
@@ -743,6 +739,86 @@ class FOLGenerator:
             print(k)
             print('value: \n'+str(v))
 
+    def extract_spatiotemporal_relationships(self):
+        locations = search.findall(self.cons.root, filter_=lambda node: node.role == 'LOCATION')
+        for location in locations:
+            relationships = search.findall(location, filter_=lambda node: node.parent == location and
+                                          node.role in ['R', 'r'])
+            anchors = search.findall(location, filter_=lambda node: node.role in ['p', 'P', 'd'])
+            anchor_names = list(map(lambda node: node.name, anchors))
+            first = None
+            relation = None
+            if len(relationships) == 0:
+                continue
+            elif len(relationships) > 1:
+                continue
+            else:
+                relationship = relationships[0]
+                r_nodes = search.findall(self.dep.root, filter_=lambda node: node.name.strip() == relationship.name and
+                                                              node.spans[0]['start'] >= relationship.spans['start'] - 2
+                                                              and node.spans[0]['end'] <= relationship.spans['end'] + 3)
+                if len(r_nodes) != 1:
+                    continue
+                r_node = r_nodes[0]
+                subjects = search.findall(self.dep.root, filter_=lambda node: node.role in ['p', 'P', 'e', 'E'] and
+                                          node.name not in anchor_names)
+                found = False
+                if r_node.parent is not None:
+                    # pattern 1 -- sibling (before)
+                    for sibling in r_node.parent.children:
+                        if sibling == r_node:
+                            break
+                        if sibling.role in ['p', 'P', 'e', 'E']:
+                            first = PlaceDependencyTree.clone_node_without_children(sibling)
+                            found = True
+                            break
+
+                    # pattern 2 -- father
+                    if not found:
+                        parent = r_node.parent
+                        while parent is not None:
+                            if parent.role in ['p', 'P', 'e', 'E']:
+                                first = PlaceDependencyTree.clone_node_without_children(parent)
+                                found = True
+                                break
+                            parent = parent.parent
+
+                # pattern 3 -- child
+                if not found:
+                    childs = search.findall(r_node, filter_=lambda node: node.role in ['P', 'p', 'E', 'e'] and
+                                            node.name not in anchor_names)
+                    if len(childs) == 1:
+                        first = PlaceDependencyTree.clone_node_without_children(childs[0])
+
+                if found:
+                    relation = PlaceDependencyTree.clone_node_without_children(r_node)
+                # pattern 4 -- not a spatial relationship but a property-preposition
+                if not found and len(subjects) == 0:
+                    r_node.role = ''
+                    location.role = ''
+                    relationship.role = ''
+                    if r_node.parent is not None and r_node.parent.role == 'o':
+                        first = PlaceDependencyTree.clone_node_without_children(r_node.parent)
+                        relation = AnyNode(name=r_node.name, spans=[{}], attributes=None, link='PROPERTY',
+                                           nodeType='RELATION')
+                if first is not None and relation is not None:
+                    for anchor in anchors:
+                        second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
+                        self.dependencies['criteria'].append(Dependency(first, relation, second))
+                        if len(locations) > 1:
+                            break
+                else:
+                    if len(subjects) == 1:
+                        first = PlaceDependencyTree.clone_node_without_children(subjects[0])
+                        relation = PlaceDependencyTree.clone_node_without_children(r_node)
+                        for anchor in anchors:
+                            second = PlaceDependencyTree.clone_node_without_children(anchor, cons_tree=True)
+                            self.dependencies['criteria'].append(Dependency(first, relation, second))
+                            if len(locations) > 1:
+                                break
+                    else:
+                        print('WTF?')
+
 
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
@@ -794,26 +870,34 @@ class PlaceDependencyTree:
     def clean_d_tree(self, str_dict):
         for k, v in str_dict.items():
             nodes = search.findall(self.root, filter_=lambda node: node.spans[0]['start'] >= v['start'] and
-            node.spans[0]['end'] <= v['end']+3 and node.name in k)
-            selected = None
-            depth = 1000
-            for node in nodes:
-                if depth > node.depth:
-                    selected = node
-                    depth = node.depth
-            children = []
-            if selected is not None:
+            node.spans[0]['end'] <= v['end']+3 and node.name.strip() == re.split('--', k.strip())[0])
+            if len(nodes) > 0:
+                for n in nodes:
+                    n.role = v['role']
+                    n.attributes = [v['pos']]
+            else:
+                nodes = search.findall(self.root, filter_=lambda node: node.spans[0]['start'] >= v['start'] and
+                                                                       node.spans[0]['end'] <= v[
+                                                                           'end'] + 3 and node.name in k)
+                selected = None
+                depth = 1000
                 for node in nodes:
-                    if node != selected:
-                        node.parent = None
-                        for child in node.children:
-                            children.append(child)
-                selected.name = k
-                selected.role = v['role']
-                selected.attributes = [v['pos']]
-            for child in children:
-                if child.parent is not None:
-                    child.parent = selected
+                    if depth > node.depth:
+                        selected = node
+                        depth = node.depth
+                children = []
+                if selected is not None:
+                    for node in nodes:
+                        if node != selected:
+                            node.parent = None
+                            for child in node.children:
+                                children.append(child)
+                    selected.name = re.split('--', k.strip())[0]
+                    selected.role = v['role']
+                    selected.attributes = [v['pos']]
+                for child in children:
+                    if child.parent is not None:
+                        child.parent = selected
 
     def detect_conjunctions(self):
         conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
