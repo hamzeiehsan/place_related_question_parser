@@ -689,19 +689,48 @@ class Dependency:
 
 
 class FOLGenerator:
+    CONCEPTS = {'P': 'PLACE', 'E': 'EVENT', 'L': 'LOCATION', 'd': 'DATE'}
+
     def __init__(self, cons_tree, dep_tree):
         self.cons = cons_tree
         self.dep = dep_tree
         self.dependencies = {}
+        self.variables = {}
 
     def generate_dependencies(self):
         self.dependencies['intent'] = self.extract_intent_dependency()
-        self.dependencies['criteria'] = []  # order -- conjunction, spatial relationships, qualities, comparison
+        # order -- declaration, conjunction, spatial relationships, qualities, comparison
+        self.dependencies['declaration'] = []
+        self.declare()
+        self.dependencies['criteria'] = []
         self.extract_conjunctions()
         self.extract_spatiotemporal_relationships()
         self.extract_quality_relations()
         self.extract_comparisons()
         return self.dependencies
+
+    def declare(self):
+        specifics = search.findall(self.cons.root, filter_=lambda node: node.role in ['P', 'E', 'd'] and
+                       len(node.children) == 0)
+        for node in specifics:
+            first = PlaceDependencyTree.clone_node_without_children(node, cons_tree=True)
+            relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
+            second = AnyNode(name=FOLGenerator.CONCEPTS[node.role], spans=[{}], attributes=None,
+                             link=node.name, nodeType='CONCEPT')
+            self.dependencies['declaration'].append(Dependency(first, relation, second))
+
+        var_id = 0
+        generics = search.findall(self.cons.root, filter_=lambda node: node.role in ['p', 'o', 'e'] and
+                                  len(node.children) == 0 and node.parent.role != 'MEASURE')
+        for generic in generics:
+            first = PlaceDependencyTree.clone_node_without_children(generic, cons_tree=True)
+            relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
+            second = AnyNode(name='x'+str(var_id), spans=[{}], attributes=None,
+                             link=generic.name, nodeType='VARIABLE')
+            self.dependencies['declaration'].append(Dependency(first, relation, second))
+            self.variables[first.name] = 'x'+str(var_id)
+            var_id+=1
+
 
     def extract_intent_dependency(self):
         question_words = search.findall(self.cons.root, filter_= lambda node: node.nodeType == 'WH')
