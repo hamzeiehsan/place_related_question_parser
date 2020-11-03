@@ -76,14 +76,27 @@ def load_dummy_dataset():
     # questions.append("Which hospital is nearest to Calton Hill in Edinburgh?")
     # questions.append("Which city of England is nearest to London?")
     # questions.append("What is the name of the river that flows under the Queensway Bridge in Liverpool?")
-    questions.append("Which cities or towns of the United Kingdom have a university?")
-    questions.append("What is the longest river in England and Wales?")
-    questions.append("What is the distance between Liverpool and Glasgow?")
-    questions.append("Are there any rivers that cross both England and Wales?")
-    questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and "
-                     "St. John the Baptist church?")
-    questions.append("What is the most populated city in the United Kingdom except London?")
-    questions.append("Which museums are within 3km of Saint George's Hotel in London?")
+    # questions.append("Which cities or towns of the United Kingdom have a university?")
+    # questions.append("What is the longest river in England and Wales?")
+    # questions.append("What is the distance between Liverpool and Glasgow?")
+    # questions.append("Are there any rivers that cross both England and Wales?")
+    # questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and "
+    #                  "St. John the Baptist church?")
+    # questions.append("What is the most populated city in the United Kingdom except London?")
+
+    # questions.append("Where is the closest market to Elephant and Castle underground station?")
+    # questions.append("Which is the highest building in London?")
+    # questions.append("What is the longest bridge in Scotland?")
+    # questions.append("Which is the largest royal borough of London??")
+    # questions.append("Which city in Scotland has the largest population?")
+
+    questions.append("Is the county of Antrim bigger than the county of Armagh?")
+    questions.append("Is there a mountain in the county of Greater Manchester taller than 1300 meters above sea level?")
+    questions.append("Are there more than 10 districts in Hampshire, England?")
+    questions.append("Which rivers in Scotland have more than 100 km length?")
+    questions.append("Is there a river in Ireland that crosses more than 3 cities?")
+    questions.append("Which mountains in Scotland have height more than 1000 meters?")
+    questions.append("Are the cities that River Thames crosses more than 10?")
 
     return questions
 
@@ -266,7 +279,7 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
 questions = load_dataset('data/datasets/GeoQuestion201.csv')
-questions = load_dummy_dataset()  # if you want to just test! check the function...
+# questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 
 def analyze(questions):
@@ -308,7 +321,7 @@ def analyze(questions):
         labelled = {**labelled, **tree.label_situation_activities(verbs=verbs, decisions=decisions)}
         tree.label_events_actions()
         labelled = {**labelled, **tree.label_qualities()}
-        tree.clean_single_child()
+        tree.clean_phrases()
         tree.clean_tree()
 
         labelled = {**labelled, **tree.label_spatiotemporal_relationships()}
@@ -328,7 +341,7 @@ def analyze(questions):
                                                                'pos': 'ADJ'}
 
         tree.label_events_actions()
-        tree.clean_single_child()
+        tree.clean_phrases()
         logging.info('constituency tree:\n' + str(tree))
         labelled = clean_extracted_info(labelled)
         logging.info('encoded elements:\n' + str(labelled))

@@ -252,7 +252,7 @@ class PlaceQuestionParseTree:
                 else:
                     PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0])
 
-    def clean_single_child(self):
+    def clean_phrases(self):
         single_child_nodes = search.findall(self.root, filter_= lambda node: len(node.children) == 1)
         for node in single_child_nodes:
             try:
@@ -264,6 +264,12 @@ class PlaceQuestionParseTree:
                 node.children = children
             except:
                 print('error in cleaning...')
+
+        incorrect_types = search.findall(self.root, filter_= lambda node: len(node.children) > 0 and
+                                         node.role in ['p', 'P'])
+        for it in incorrect_types:
+            if len(search.findall(it, filter_= lambda node: node != it and node.role in ['p', 'P'])) == 0:
+                it.role = ''
 
     @staticmethod
     def merge(node1, node2, order=True):
@@ -503,6 +509,11 @@ class PlaceQuestionParseTree:
                 if child.nodeType == 'IN':
                     adj.parent = None
                     child.name = adj.name+' '+child.name
+                    if child.name.endswith('than'):
+                        child.role = '<>'
+                        compounds[child.name + '--' + str(child.spans['start'])] = {'start': child.spans['start'],
+                                                                                    'end': child.spans['end'],
+                                                                                    'role': child.role, 'pos': 'ADJ'}
                 elif child.nodeType == 'PP' and child.children[0].nodeType == 'IN':
                     if adj.parent is not None and len(adj.parent.children) == 2:
                         child.parent = adj.parent
@@ -511,10 +522,21 @@ class PlaceQuestionParseTree:
                         adj.parent = None
                         child.children[0].name = adj.name+' '+child.children[0].name
                         child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
+                        if child.children[0].name.endswith('than'):
+                            child.children[0].role = '<>'
+                            compounds[child.children[0].name+'--'+str(child.children[0].spans['start'])] = {
+                                'start': child.children[0].spans['start'], 'end': child.children[0].spans['end'],
+                                'role':child.children[0].role, 'pos':'ADJ'}
                     else:
                         adj.parent = None
                         child.children[0].name = adj.name + ' ' + child.children[0].name
                         child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
+                        if child.children[0].name.endswith('than'):
+                            child.children[0].role = '<>'
+                            compounds[child.children[0].name+'--'+str(child.children[0].spans['start'])] = {
+                                'start': child.children[0].spans['start'],
+                                'end': child.children[0].spans['end'],
+                                'role':child.children[0].role, 'pos':'ADJ'}
                 else:
                     print('unresolved adjective '+ adj.name + ' ' + child.name)
         return compounds
@@ -677,6 +699,8 @@ class FOLGenerator:
         self.dependencies['criteria'] = []  # order -- conjunction, spatial relationships, qualities, comparison
         self.extract_conjunctions()
         self.extract_spatiotemporal_relationships()
+        self.extract_quality_relations()
+        self.extract_comparisons()
         return self.dependencies
 
     def extract_intent_dependency(self):
@@ -739,6 +763,76 @@ class FOLGenerator:
         for k, v in self.dependencies.items():
             print(k)
             print('value: \n'+str(v))
+
+    def extract_comparisons(self):
+        comps = search.findall(self.cons.root, filter_= lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
+        for comp in comps:
+            d_comp = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == comp.name.strip())
+            if len(d_comp) != 1:
+                continue
+            d_comp = d_comp[0]
+            found = False
+            right = None
+            for child in comp.parent.children:
+                if child == comp:
+                    found = True
+                elif found:
+                    right = child
+                    break
+
+            while right.role == '' and len(right.children) > 0:
+                right = right.children[0]
+            if right.role == '':
+                continue
+
+            # pattern 1 -- path to root
+            left = d_comp.parent
+            while left is not None and left.parent is not None and left.role not in ['p', 'P', 's', 'o']:
+                left = left.parent
+            if (left is None or left.role not in ['p', 'P', 's', 'o'])\
+                    and len(d_comp.children) > 0:  # pattern 2 -- valid children[0][0]...
+                left = d_comp.children[0]
+                while len(left.children) > 0 and left.role not in ['p', 'P', 's', 'o']:
+                    left = left.children[0]
+            if left.role not in ['p', 'P', 's', 'o']:
+                continue
+            first = PlaceDependencyTree.clone_node_without_children(left)
+            second = PlaceDependencyTree.clone_node_without_children(right, cons_tree=True)
+            relation = PlaceDependencyTree.clone_node_without_children(comp, cons_tree=True)
+            self.dependencies['criteria'].append(Dependency(first, relation, second))
+
+
+
+
+    def extract_quality_relations(self):
+        qualities = search.findall(self.cons.root, filter_= lambda node: node.role in ['Q', 'q'])
+        quality_map = {'Q': ['p', 'P'], 'q': ['e', 'E', 'o']}
+        for q in qualities:
+            reference = search.findall(q.parent, filter_= lambda node: node.parent == q.parent and
+                                                                       node.role in quality_map[q.role])
+            if len(reference) == 0:
+                continue
+            reference = reference[0]
+            d_q = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == q.name.strip())
+            if len(d_q) != 1:
+                continue
+            d_q = d_q[0]
+            if q.nodeType == 'JJS' or len(q.children) > 0 and len(search.findall(q, filter_= lambda node:
+            node.nodeType in ['RBS', 'JJS'])) > 0:
+                first = PlaceDependencyTree.clone_node_without_children(reference, cons_tree= True)
+                second = PlaceDependencyTree.clone_node_without_children(d_q)
+                relation = AnyNode(name='IS/ARE', spans=[{}], attributes=None, link='SUPERLATIVE',
+                                           nodeType='RELATION')
+                self.dependencies['criteria'].append(Dependency(first, relation, second))
+            elif q.role == 'JJR' or len(q.children) > 0 and len(search.findall(q, filter_= lambda node:
+            node.nodeType in ['RBR', 'JJR'])) > 0:
+                print('Comparative')
+            else:
+                first = PlaceDependencyTree.clone_node_without_children(reference, cons_tree=True)
+                second = PlaceDependencyTree.clone_node_without_children(d_q)
+                relation = AnyNode(name='IS/ARE', spans=[{}], attributes=None, link='PROPERTY',
+                                   nodeType='RELATION')
+                self.dependencies['criteria'].append(Dependency(first, relation, second))
 
     def extract_conjunctions(self):
         and_or = ['&', '|']
