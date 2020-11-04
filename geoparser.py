@@ -69,12 +69,12 @@ def load_dummy_dataset():
     # questions.append("In which part of England is Liverpool located?")
     # questions.append("What is the name of Britain's longest river?")
     # questions.append("Which hotels are in England's capital?")
-    # questions.append("What tourist attractions are there in Belfast, Northern Ireland?")
+    questions.append("What tourist attractions are there in Belfast, Northern Ireland?")
     # questions.append("Which pubs are near Mercure Hotel in Glasgow, Scotland?")
     # questions.append("Which are the main railway stations in Glasgow, Scotland?")
 
-    # questions.append("Which hospital is nearest to Calton Hill in Edinburgh?")
-    # questions.append("Which city of England is nearest to London?")
+    questions.append("Which hospital is nearest to Calton Hill in Edinburgh?")
+    questions.append("Which city of England is nearest to London?")
     # questions.append("What is the name of the river that flows under the Queensway Bridge in Liverpool?")
     # questions.append("Which cities or towns of the United Kingdom have a university?")
     # questions.append("What is the longest river in England and Wales?")
@@ -84,19 +84,20 @@ def load_dummy_dataset():
     #                  "St. John the Baptist church?")
     # questions.append("What is the most populated city in the United Kingdom except London?")
 
-    # questions.append("Where is the closest market to Elephant and Castle underground station?")
-    # questions.append("Which is the highest building in London?")
-    # questions.append("What is the longest bridge in Scotland?")
-    # questions.append("Which is the largest royal borough of London??")
+    questions.append("Where is the closest market to Elephant and Castle underground station?")
+    questions.append("Which is the highest building in London?")
+    questions.append("What is the longest bridge in Scotland?")
+    questions.append("Which is the largest royal borough of London??")
     # questions.append("Which city in Scotland has the largest population?")
 
-    questions.append("Is the county of Antrim bigger than the county of Armagh?")
-    questions.append("Is there a mountain in the county of Greater Manchester taller than 1300 meters above sea level?")
-    questions.append("Are there more than 10 districts in Hampshire, England?")
-    questions.append("Which rivers in Scotland have more than 100 km length?")
-    questions.append("Is there a river in Ireland that crosses more than 3 cities?")
-    questions.append("Which mountains in Scotland have height more than 1000 meters?")
-    questions.append("Are the cities that River Thames crosses more than 10?")
+    # questions.append("Is the county of Antrim bigger than the county of Armagh?")
+    # questions.append("Is there a mountain in the county of Greater Manchester taller than 1300 meters above sea level?")
+    # questions.append("Are there more than 10 districts in Hampshire, England?")
+    # questions.append("Which rivers in Scotland have more than 100 km length?")
+    # questions.append("Is there a river in Ireland that crosses more than 3 cities?")
+    # questions.append("Which mountains in Scotland have height more than 1000 meters?")
+
+    # questions.append("How many rivers cross Edinburgh?")
 
     return questions
 
@@ -279,7 +280,7 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
 questions = load_dataset('data/datasets/GeoQuestion201.csv')
-# questions = load_dummy_dataset()  # if you want to just test! check the function...
+questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 
 def analyze(questions):
@@ -302,9 +303,9 @@ def analyze(questions):
         compound_qw = find_compound_question_words(question)
         for qw in compound_qw.keys():
             role = ''
-            if qw in COMPOUNDS_QW_ROLE.keys():
-                role = COMPOUNDS_QW_ROLE[qw]
-            tree.label_role(qw, role, clean=True, question_words=True)
+            if re.split('--', qw.strip())[0] in COMPOUNDS_QW_ROLE.keys():
+                role = COMPOUNDS_QW_ROLE[re.split('--', qw.strip())[0]]
+            tree.label_role(re.split('--', qw.strip())[0], role, clean=True, question_words=True)
         labelled = {**labelled, **compound_qw}
 
         ners = construct_cleaning_labels(result, question)
@@ -364,6 +365,8 @@ def analyze(questions):
         # print FOL statements
         # todo define variables (p, e, o); implicit (where - situations/activities);
         #  define properties and constants; define relationships
+        fol.print_logical_form()
+
 
         # generate GeoSPARQL queries from FOL statements (deps)
         # todo

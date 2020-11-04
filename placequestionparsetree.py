@@ -675,6 +675,7 @@ class Dependency:
         self.arg1 = node1
         self.relation = relation
         self.arg2 = node2
+        self.extra = []
 
     def is_binary(self):
         if self.arg2 is None:
@@ -682,20 +683,26 @@ class Dependency:
         return True
 
     def __repr__(self):
-        string = str(self.relation)+':\n\t'+str(self.arg1)
+        string = '\n'+str(self.relation)+':\n\t'+str(self.arg1)
         if self.is_binary():
             string += '\n\t'+str(self.arg2)
+        for ex in self.extra:
+            string += '\n\t\t'+str(ex)
         return string
 
 
 class FOLGenerator:
     CONCEPTS = {'P': 'PLACE', 'E': 'EVENT', 'L': 'LOCATION', 'd': 'DATE'}
+    SPECIAL_CHARS = {'and': 8743, 'or': 8744, 'not': 172, 'implies': 8658, 'universal': 8704, 'existential': 8707}
+    # e.g., result = chr(SPECIAL_CHARS['existential'])+' x0: Place(Tehran) '
+    # +chr(SPECIAL_CHARS['and'])+' IN(x0, Tehran) '+chr(SPECIAL_CHARS['and'])+' City(x0)'
 
     def __init__(self, cons_tree, dep_tree):
         self.cons = cons_tree
         self.dep = dep_tree
         self.dependencies = {}
         self.variables = {}
+        self.constants = []
 
     def generate_dependencies(self):
         self.dependencies['intent'] = self.extract_intent_dependency()
@@ -714,6 +721,7 @@ class FOLGenerator:
                        len(node.children) == 0)
         for node in specifics:
             first = PlaceDependencyTree.clone_node_without_children(node, cons_tree=True)
+            self.constants.append(node.name)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
             second = AnyNode(name=FOLGenerator.CONCEPTS[node.role], spans=[{}], attributes=None,
                              link=node.name, nodeType='CONCEPT')
@@ -721,7 +729,7 @@ class FOLGenerator:
 
         var_id = 0
         generics = search.findall(self.cons.root, filter_=lambda node: node.role in ['p', 'o', 'e'] and
-                                  len(node.children) == 0 and node.parent.role != 'MEASURE')
+                                  len(node.children) == 0 and node.parent.role not in ['R','MEASURE'])
         for generic in generics:
             first = PlaceDependencyTree.clone_node_without_children(generic, cons_tree=True)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
@@ -730,7 +738,6 @@ class FOLGenerator:
             self.dependencies['declaration'].append(Dependency(first, relation, second))
             self.variables[first.name] = 'x'+str(var_id)
             var_id+=1
-
 
     def extract_intent_dependency(self):
         question_words = search.findall(self.cons.root, filter_= lambda node: node.nodeType == 'WH')
@@ -792,6 +799,75 @@ class FOLGenerator:
         for k, v in self.dependencies.items():
             print(k)
             print('value: \n'+str(v))
+
+    def print_logical_form(self):
+        logical_form = ''
+        if len(self.variables.keys()) == 1:
+            key = list(self.variables.keys())[0]
+            var = self.variables[key]
+            intent = self.dependencies['intent']
+            if intent.arg1.role == '8':
+                logical_form+=chr(FOLGenerator.SPECIAL_CHARS['existential'])+' '+var+' '
+            elif intent.arg1.role == '6' or intent.arg1.role == '1':  # how many, where
+                logical_form+=intent.relation.link+'('+var+') :'
+            else:
+                logical_form += var+': '
+            declarations = self.dependencies['declaration']
+
+            for declaration in declarations:
+                if declaration.arg2.nodeType == 'VARIABLE':
+                    logical_form += declaration.arg2.link.replace(' ', '_').upper()+'('+declaration.arg2.name+') '+\
+                                  chr(FOLGenerator.SPECIAL_CHARS['and'])+' '
+                else:
+                    logical_form += declaration.arg2.name+'('+declaration.arg1.name+')'+\
+                        chr(FOLGenerator.SPECIAL_CHARS['and'])+' '
+            criteria = self.dependencies['criteria']
+            # for criterion in criteria:
+            counter = 1
+            for criterion in criteria:
+                if counter == len(criteria):
+                    logical_form = self.generate_FOL_criterion(criterion, logical_form, last=True)
+                else:
+                    logical_form = self.generate_FOL_criterion(criterion, logical_form)
+                    counter += 1
+
+            if len(criteria) == 0:
+                logical_form = logical_form[0 : len(logical_form) - 2]
+        print(logical_form)
+        print()
+
+    def generate_FOL_criterion(self, criterion, logical_form, last=False):
+        if criterion.arg1.name in self.variables.keys():
+            criterion.arg1.name = self.variables[criterion.arg1.name]
+        if criterion is not None and criterion.arg2.name in self.variables.keys():
+            criterion.arg2.name = self.variables[criterion.arg2.name]
+
+        if criterion.relation.link in ['PROPERTY', 'AND/OR', 'NOT']:
+            logical_form += criterion.relation.name.upper().replace(' ', '_')+ '(' + criterion.arg1.name
+            if criterion.arg2 is not None:
+                logical_form += ', '+criterion.arg2.name
+            logical_form+= ') '
+
+        elif criterion.relation.link == 'SUPERLATIVE':
+            if criterion.arg1.name in self.variables.values():
+                logical_form = logical_form.replace(criterion.arg1.name, criterion.arg2.name.replace(' ', '_').upper()+
+                                     '('+criterion.arg1.name+')', 1)
+                if last:
+                    logical_form = logical_form[0: len(logical_form) -2]
+                last = True
+            else:
+                logical_form += criterion.arg2.name.replace(' ', '_').upper()+ '('+criterion.arg1.name+') '
+        else:  # other
+            logical_form += criterion.relation.name.upper().replace(' ', '_') + '(' + criterion.arg1.name
+            if criterion.arg2 is not None:
+                logical_form += ', ' + criterion.arg2.name
+            for ex in criterion.extra:
+                logical_form += ', ' + ex.name
+            logical_form += ') '
+        if not last:
+            logical_form += chr(FOLGenerator.SPECIAL_CHARS['and']) + ' '
+        return logical_form
+
 
     def extract_comparisons(self):
         comps = search.findall(self.cons.root, filter_= lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
@@ -874,7 +950,7 @@ class FOLGenerator:
                     if s1 != s2:
                         first = PlaceDependencyTree.clone_node_without_children(s1, cons_tree=True)
                         second = PlaceDependencyTree.clone_node_without_children(s2, cons_tree=True)
-                        relation = AnyNode(name=conj.name, spans=[{}], attributes=None, link=conj.name.upper(),
+                        relation = AnyNode(name=conj.name.upper(), spans=[{}], attributes=None, link='AND/OR',
                                            nodeType='RELATION')
                         self.dependencies['criteria'].append(Dependency(first, relation, second))
         not_nor = ['!']
@@ -890,7 +966,7 @@ class FOLGenerator:
                     if d_conj.parent.role in ['p', 'e']:
                         first = PlaceDependencyTree.clone_node_without_children(d_conj.parent)
                         second = PlaceDependencyTree.clone_node_without_children(next, cons_tree=True)
-                        relation = AnyNode(name=negation.name, spans=[{}], attributes=None, link=negation.name.upper(),
+                        relation = AnyNode(name=negation.name.upper(), spans=[{}], attributes=None, link='NOT',
                                            nodeType='RELATION')
                         self.dependencies['criteria'].append(Dependency(first, relation, second))
 
@@ -992,11 +1068,8 @@ class FOLGenerator:
                     measures = search.findall(relationship, filter_= lambda node: node.role == 'MEASURE')
                     if len(measures) == 1:
                         measure = measures[0]
-                        first = PlaceDependencyTree.clone_node_without_children(r_node)
-                        relation = AnyNode(name='MEASURE', spans=[{}], attributes=None, link='ARGUMENT',
-                                           nodeType='RELATION')
-                        second = PlaceDependencyTree.clone_node_without_children(measure, cons_tree=True)
-                        self.dependencies['criteria'].append(Dependency(first, relation, second))
+                        extra = PlaceDependencyTree.clone_node_without_children(measure, cons_tree=True)
+                        self.dependencies['criteria'][len(self.dependencies['criteria'])-1].extra.append(extra)
 
 
 class PlaceDependencyTree:
