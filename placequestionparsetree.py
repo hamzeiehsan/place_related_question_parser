@@ -924,6 +924,7 @@ class FOLGenerator:
                 and_or_criteria.append(criterion)
         if len(and_or_criteria) == 0:
             return
+        new_criteria = []
         for criterion in criteria:
             if criterion.relation.link == 'AND/OR':
                 continue
@@ -954,7 +955,11 @@ class FOLGenerator:
                         first = PlaceDependencyTree.clone_node_without_children(criterion.arg1)
                     else:
                         second = PlaceDependencyTree.clone_node_without_children(criterion.arg2)
-                    self.dependencies['criteria'].append(Dependency(first, relation, second))
+
+                    dependency = Dependency(first, relation, second)
+                    dependency.extra = criterion.extra
+                    new_criteria.append(dependency)
+        self.dependencies['criteria'].extend(new_criteria)
 
     def extract_comparisons(self):
         comps = search.findall(self.cons.root, filter_= lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
@@ -1029,9 +1034,12 @@ class FOLGenerator:
         for conj in conjs:
             siblings = search.findall(conj.parent, filter_= lambda node: node.parent == conj.parent and
                            node.role in ['p', 'P', 'e', 'E'])
+            pairs = []
             for s1 in siblings:
                 for s2 in siblings:
-                    if s1 != s2:
+                    if s1 != s2 and s1.name+' '+s2.name not in pairs:
+                        pairs.append(s1.name+' '+s2.name)
+                        pairs.append(s2.name+' '+s1.name)
                         first = PlaceDependencyTree.clone_node_without_children(s1, cons_tree=True)
                         second = PlaceDependencyTree.clone_node_without_children(s2, cons_tree=True)
                         rel_name = FOLGenerator.SPECIAL_CHARS['and']
