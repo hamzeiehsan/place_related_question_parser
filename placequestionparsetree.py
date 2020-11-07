@@ -491,6 +491,11 @@ class PlaceQuestionParseTree:
         compounds = {}
         found = False
         for child in adj.parent.children:
+            if not found and adj.nodeType.startswith('J') and child.nodeType == 'RBS':
+                if child.name + ' ' + adj.name in adj.parent.name:
+                    adj.name = child.name + ' ' + adj.name
+                    adj.nodeType = 'JJS'
+                    child.parent = None
             if child == adj:
                 found = True
             elif found and child.nodeType.startswith('N'):
@@ -717,10 +722,9 @@ class FOLGenerator:
         return self.dependencies
 
     def declare(self):
-        specifics = search.findall(self.cons.root, filter_=lambda node: node.role in ['P', 'E', 'd'] and
-                       len(node.children) == 0)
+        specifics = search.findall(self.dep.root, filter_=lambda node: node.role in ['P', 'E', 'd'])
         for node in specifics:
-            first = PlaceDependencyTree.clone_node_without_children(node, cons_tree=True)
+            first = PlaceDependencyTree.clone_node_without_children(node)
             self.constants.append(node.name)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
             second = AnyNode(name=FOLGenerator.CONCEPTS[node.role], spans=[{}], attributes=None,
@@ -728,10 +732,9 @@ class FOLGenerator:
             self.dependencies['declaration'].append(Dependency(first, relation, second))
 
         var_id = 0
-        generics = search.findall(self.cons.root, filter_=lambda node: node.role in ['p', 'o', 'e'] and
-                                  len(node.children) == 0 and node.parent.role not in ['R','MEASURE'])
+        generics = search.findall(self.dep.root, filter_=lambda node: node.role in ['p', 'o', 'e'])
         for generic in generics:
-            first = PlaceDependencyTree.clone_node_without_children(generic, cons_tree=True)
+            first = PlaceDependencyTree.clone_node_without_children(generic)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
             second = AnyNode(name='x'+str(var_id), spans=[{}], attributes=None,
                              link=generic.name, nodeType='VARIABLE')
@@ -801,38 +804,55 @@ class FOLGenerator:
             print('value: \n'+str(v))
 
     def print_logical_form(self):
+        # intent
         logical_form = ''
-        if len(self.variables.keys()) == 1:
-            key = list(self.variables.keys())[0]
-            var = self.variables[key]
-            intent = self.dependencies['intent']
-            if intent.arg1.role == '8':
-                logical_form+=chr(FOLGenerator.SPECIAL_CHARS['existential'])+' '+var+' '
-            elif intent.arg1.role == '6' or intent.arg1.role == '1':  # how many, where
-                logical_form+=intent.relation.link+'('+var+') :'
+        intent = self.dependencies['intent']
+        complex_intents = self.apply_conjunction_intent()
+        if intent.arg1.role == '8' and intent.arg2 is not None:
+            logical_form += chr(FOLGenerator.SPECIAL_CHARS['existential']) + ' ' + intent.arg2.name
+            for i in complex_intents:
+                logical_form+= ', '+i.arg2.name
+        elif intent.arg1.role == '6' or intent.arg1.role == '1':  # how many, where
+            logical_form += intent.relation.link + '(' + intent.arg2.name + ')'
+            for i in complex_intents:
+                logical_form+= ', '+intent.relation.link + '(' + i.arg2.name + ')'
+        else:
+            logical_form += intent.arg2.name
+            for i in complex_intents:
+                logical_form+= ', '+i.arg2.name
+        if logical_form != '':
+            logical_form+=': '
+
+        # declarations
+        declarations = self.dependencies['declaration']
+        for declaration in declarations:
+            if declaration.arg2.nodeType == 'VARIABLE':
+                logical_form += declaration.arg2.link.replace(' ', '_').upper() + '(' + declaration.arg2.name + ') ' + \
+                                chr(FOLGenerator.SPECIAL_CHARS['and']) + ' '
             else:
-                logical_form += var+': '
-            declarations = self.dependencies['declaration']
+                logical_form += declaration.arg2.name + '(' + declaration.arg1.name + ') ' + \
+                                chr(FOLGenerator.SPECIAL_CHARS['and']) + ' '
 
-            for declaration in declarations:
-                if declaration.arg2.nodeType == 'VARIABLE':
-                    logical_form += declaration.arg2.link.replace(' ', '_').upper()+'('+declaration.arg2.name+') '+\
-                                  chr(FOLGenerator.SPECIAL_CHARS['and'])+' '
-                else:
-                    logical_form += declaration.arg2.name+'('+declaration.arg1.name+')'+\
-                        chr(FOLGenerator.SPECIAL_CHARS['and'])+' '
-            criteria = self.dependencies['criteria']
-            # for criterion in criteria:
-            counter = 1
-            for criterion in criteria:
-                if counter == len(criteria):
-                    logical_form = self.generate_FOL_criterion(criterion, logical_form, last=True)
-                else:
-                    logical_form = self.generate_FOL_criterion(criterion, logical_form)
-                    counter += 1
+        # criteria
+        self.apply_conjunction_criteria()
+        criteria = self.dependencies['criteria']
+        counter = 1
+        for criterion in criteria:
+            if criterion.relation.link == 'AND/OR':
+                counter += 1
+                continue
+            if counter == len(criteria):
+                logical_form = self.generate_FOL_criterion(criterion, logical_form, last=True)
+            else:
+                logical_form = self.generate_FOL_criterion(criterion, logical_form)
+                counter += 1
 
-            if len(criteria) == 0:
-                logical_form = logical_form[0 : len(logical_form) - 2]
+        if logical_form.endswith(chr(FOLGenerator.SPECIAL_CHARS['and'])+' '):
+            logical_form = logical_form[0: len(logical_form) - 2]
+
+        for key, var in self.variables.items():
+            logical_form = logical_form.replace(key, var)
+
         print(logical_form)
         print()
 
@@ -842,14 +862,14 @@ class FOLGenerator:
         if criterion is not None and criterion.arg2.name in self.variables.keys():
             criterion.arg2.name = self.variables[criterion.arg2.name]
 
-        if criterion.relation.link in ['PROPERTY', 'AND/OR', 'NOT']:
+        if criterion.relation.link in ['PROPERTY', 'NOT']:
             logical_form += criterion.relation.name.upper().replace(' ', '_')+ '(' + criterion.arg1.name
             if criterion.arg2 is not None:
                 logical_form += ', '+criterion.arg2.name
             logical_form+= ') '
 
         elif criterion.relation.link == 'SUPERLATIVE':
-            if criterion.arg1.name in self.variables.values():
+            if criterion.arg1.name in self.variables.keys():
                 logical_form = logical_form.replace(criterion.arg1.name, criterion.arg2.name.replace(' ', '_').upper()+
                                      '('+criterion.arg1.name+')', 1)
                 if last:
@@ -861,13 +881,80 @@ class FOLGenerator:
             logical_form += criterion.relation.name.upper().replace(' ', '_') + '(' + criterion.arg1.name
             if criterion.arg2 is not None:
                 logical_form += ', ' + criterion.arg2.name
+            extra = ''
             for ex in criterion.extra:
                 logical_form += ', ' + ex.name
+                extra += ex.name+' '
             logical_form += ') '
+            logical_form = logical_form.replace(extra.upper().replace(" ", "_"), '')
         if not last:
             logical_form += chr(FOLGenerator.SPECIAL_CHARS['and']) + ' '
         return logical_form
 
+    def apply_conjunction_intent(self):
+        result = []
+        intent = self.dependencies['intent']
+        if intent.arg2 is None:
+            return result
+        name = intent.arg2.name
+        criteria = self.dependencies['criteria']
+        for criterion in criteria:
+            found = False
+            if criterion.relation.link == 'AND/OR':
+                second = None
+                if criterion.arg1.name == name:
+                    second = PlaceDependencyTree.clone_node_without_children(intent.arg2)
+                    second.name = criterion.arg2.name
+                    found = True
+                elif criterion.arg2.name == name:
+                    second = PlaceDependencyTree.clone_node_without_children(intent.arg2)
+                    second.name = criterion.arg1.name
+                    found = True
+                if found:
+                    first = PlaceDependencyTree.clone_node_without_children(intent.arg1)
+                    relation = intent.relation
+                    result.append(Dependency(first, relation, second))
+        return result
+
+    def apply_conjunction_criteria(self):
+        criteria = self.dependencies['criteria']
+        and_or_criteria = []
+        for criterion in criteria:
+            if criterion.relation.link == 'AND/OR':
+                and_or_criteria.append(criterion)
+        if len(and_or_criteria) == 0:
+            return
+        for criterion in criteria:
+            if criterion.relation.link == 'AND/OR':
+                continue
+            for ao in and_or_criteria:
+                first = None
+                relation = None
+                second = None
+                found = False
+                if criterion.arg1.name == ao.arg1.name:
+                    first = PlaceDependencyTree.clone_node_without_children(criterion.arg1)
+                    first.name = ao.arg2.name
+                    found = True
+                elif criterion.arg2.name == ao.arg1.name:
+                    second = PlaceDependencyTree.clone_node_without_children(criterion.arg2)
+                    second.name = ao.arg2.name
+                    found = True
+                elif criterion.arg1.name == ao.arg2.name:
+                    first = PlaceDependencyTree.clone_node_without_children(criterion.arg1)
+                    first.name = ao.arg1.name
+                    found = True
+                elif criterion.arg2.name == ao.arg2.name:
+                    second = PlaceDependencyTree.clone_node_without_children(criterion.arg2)
+                    second.name = ao.arg1.name
+                    found = True
+                if found:
+                    relation = criterion.relation
+                    if first is None:
+                        first = PlaceDependencyTree.clone_node_without_children(criterion.arg1)
+                    else:
+                        second = PlaceDependencyTree.clone_node_without_children(criterion.arg2)
+                    self.dependencies['criteria'].append(Dependency(first, relation, second))
 
     def extract_comparisons(self):
         comps = search.findall(self.cons.root, filter_= lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
@@ -905,9 +992,6 @@ class FOLGenerator:
             second = PlaceDependencyTree.clone_node_without_children(right, cons_tree=True)
             relation = PlaceDependencyTree.clone_node_without_children(comp, cons_tree=True)
             self.dependencies['criteria'].append(Dependency(first, relation, second))
-
-
-
 
     def extract_quality_relations(self):
         qualities = search.findall(self.cons.root, filter_= lambda node: node.role in ['Q', 'q'])
@@ -950,7 +1034,10 @@ class FOLGenerator:
                     if s1 != s2:
                         first = PlaceDependencyTree.clone_node_without_children(s1, cons_tree=True)
                         second = PlaceDependencyTree.clone_node_without_children(s2, cons_tree=True)
-                        relation = AnyNode(name=conj.name.upper(), spans=[{}], attributes=None, link='AND/OR',
+                        rel_name = FOLGenerator.SPECIAL_CHARS['and']
+                        if conj.role == '|':
+                            rel_name = FOLGenerator.SPECIAL_CHARS['or']
+                        relation = AnyNode(name=rel_name, spans=[{}], attributes=None, link='AND/OR',
                                            nodeType='RELATION')
                         self.dependencies['criteria'].append(Dependency(first, relation, second))
         not_nor = ['!']
