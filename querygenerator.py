@@ -53,6 +53,7 @@ class SPARQLTemplates:
     DISTANCE_RELATIONSHIP = '\tFILTER(geof:distance(<PI1>GEOM, <PI2>GEOM, <UNIT>) < <DISTANCE>).\n'
 
     SPATIAL_RELATION_MAPPING = {'in': '\t<PI1>GEOM geosparql:ehCoveredBy <PI2>GEOM.\n',
+                                'of': '\t<PI1>GEOM geosparql:ehCoveredBy <PI2>GEOM.\n',
                                 'near': '\tFILTER (geof:distance(<PI1>GEOM, <PI2>GEOM, units:metre) < 5000).\n',
                                 'close to': '\tFILTER (geof:distance(<PI1>GEOM, <PI2>GEOM, units:metre) < 5000).\n',
                                 'north of': '\tFILTER (spatialF:northGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
@@ -65,6 +66,14 @@ class SPARQLTemplates:
 
 
 class SPARQLGenerator:
+    COMPLEX_RELATIONSHIPS = ['within \d.* ',
+                                    'at most \d.* ',
+                                    'less than \d.* away ',
+                                    'more than \d.* away ',
+                                    'in \d.* radius ',
+                                    'in a range of \d.* ',
+                                    'in the range of \d.* ']
+
     def __init__(self, dependencies, variables):
         self.dependencies = dependencies
         self.variables = variables
@@ -119,9 +128,28 @@ class SPARQLGenerator:
         # todo
         return
 
-    def define_spatial_relationship(self, dependency):
-        # todo
-        return
+    def find_var(self, string):
+        if string in self.variables.keys():
+            return self.variables[string]
+        return self.concept_varids[string]
+
+    def define_spatial_relationship(self, dependency, distance=False, binary=True):
+        template = ''
+        var1 = self.find_var(dependency.arg1.name)
+        var2 = self.find_var(dependency.arg2.name)
+        if binary and not distance:
+            if dependency.relation.name in SPARQLTemplates.SPATIAL_RELATION_MAPPING.keys():
+                template = SPARQLTemplates.SPATIAL_RELATION_MAPPING[dependency.relation.name]
+                template = template.replace("<PI1>", var1).replace("<PI2>", var2)
+        elif distance:
+            template = SPARQLTemplates.DISTANCE_RELATIONSHIP
+            template = template.replace("<PI1>", var1).replace("<PI2>", var2)
+            measure = dependency.extra[0]
+            val_unit = measure.name.replace('most ', '').strip().split()
+            val = val_unit[0]
+            unit = val_unit[1]
+            template = template.replace('<DISTANCE>', val).replace('<UNIT>', unit)
+        return template
 
     def define_situations(self, dependency):
         # todo
@@ -132,6 +160,21 @@ class SPARQLGenerator:
         # define var_ids for concepts
         where_clause += self.declare()
 
+        criteria = self.dependencies['criteria']
+        for criterion in criteria:
+            if criterion.relation.link == 'AND/OR':
+                continue
+            if criterion.relation.name == 'IS/ARE':
+                print('todo!')
+            elif criterion.relation.link == 'PROPERTY':
+                print('todo')
+            elif criterion.relation.link == 'NOT':
+                print('todo')
+            elif criterion.relation.role == 'R':  # spatial relationships
+                if len(criterion.extra) == 0:
+                    where_clause += self.define_spatial_relationship(criterion)
+                else:
+                    where_clause += self.define_spatial_relationship(criterion, distance=True)
         # todo define attributes
 
         # todo define spatial relationships

@@ -808,10 +808,11 @@ class FOLGenerator:
         logical_form = ''
         intent = self.dependencies['intent']
         complex_intents = self.apply_conjunction_intent()
-        if intent.arg1.role == '8' and intent.arg2 is not None:
-            logical_form += chr(FOLGenerator.SPECIAL_CHARS['existential']) + ' ' + intent.arg2.name
-            for i in complex_intents:
-                logical_form+= ', '+i.arg2.name
+        if intent.arg1.role == '8':
+            if intent.arg2 is not None:
+                logical_form += chr(FOLGenerator.SPECIAL_CHARS['existential']) + ' ' + intent.arg2.name
+                for i in complex_intents:
+                    logical_form+= ', '+i.arg2.name
         elif intent.arg1.role == '6' or intent.arg1.role == '1':  # how many, where
             logical_form += intent.relation.link + '(' + intent.arg2.name + ')'
             for i in complex_intents:
@@ -857,10 +858,10 @@ class FOLGenerator:
         print()
 
     def generate_FOL_criterion(self, criterion, logical_form, last=False):
-        if criterion.arg1.name in self.variables.keys():
-            criterion.arg1.name = self.variables[criterion.arg1.name]
-        if criterion is not None and criterion.arg2.name in self.variables.keys():
-            criterion.arg2.name = self.variables[criterion.arg2.name]
+        # if criterion.arg1.name in self.variables.keys():
+        #     criterion.arg1.name = self.variables[criterion.arg1.name]
+        # if criterion is not None and criterion.arg2.name in self.variables.keys():
+        #     criterion.arg2.name = self.variables[criterion.arg2.name]
 
         if criterion.relation.link in ['PROPERTY', 'NOT']:
             logical_form += criterion.relation.name.upper().replace(' ', '_')+ '(' + criterion.arg1.name
