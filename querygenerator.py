@@ -65,19 +65,40 @@ class SPARQLTemplates:
 
 
 class SPARQLGenerator:
-    def __init__(self, dependencies):
+    def __init__(self, dependencies, variables):
         self.dependencies = dependencies
+        self.variables = variables
+
         self.concept_varids = {}
 
     def to_SPARQL(self):
-        # define var_ids for concepts
-
+        result = ''
         # use declaration to define vars in where-clause
         # use criteria to bound them in where-clause
+        where_clause = self.construct_where()
 
         # use intent to construct select/ask statements
         # define overall template (sorting?) (functions?)
-        return 'TODO'
+
+        # todo dummy
+        result = SPARQLTemplates.GENERAL_FORMAT.replace('<WHERE>', where_clause)
+
+        # return the results
+        return result
+
+    def declare(self):
+        declare_statments = ''
+        varid = 0
+        declarations = self.dependencies['declaration']
+        for declaration in declarations:
+            if declaration.arg2.nodeType == 'VARIABLE':
+                 declare_statments += SPARQLGenerator.define_variable(declaration)
+            else:
+                self.concept_varids[declaration.arg1.name] = 'c'+str(varid)
+                varid += 1
+                declare_statments += SPARQLGenerator.define_concept(declaration,
+                                                                    self.concept_varids[declaration.arg1.name])
+        return declare_statments
 
     @staticmethod
     def define_concept(dependency, varid):
@@ -91,7 +112,7 @@ class SPARQLGenerator:
     def define_variable(dependency):
         template = SPARQLTemplates.DEFINE_TYPE
         template = template.replace('<PI>', dependency.arg2.name)
-        template = template.replace('<PIVALUE>', dependency.arg1.name)
+        template = template.replace('<PTVALUE>', dependency.arg1.name)
         return template
 
     def define_attribute(self, dependency):
@@ -107,8 +128,17 @@ class SPARQLGenerator:
         return
 
     def construct_where(self):
-        # todo
-        return
+        where_clause = ''
+        # define var_ids for concepts
+        where_clause += self.declare()
+
+        # todo define attributes
+
+        # todo define spatial relationships
+
+        # todo situation
+
+        return where_clause
 
     def construct_select_ask(self):
         # todo

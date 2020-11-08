@@ -1,5 +1,6 @@
 from ner import NER, CPARSER, Embedding, DPARSER
 from placequestionparsetree import FOLGenerator
+from querygenerator import SPARQLGenerator
 import re
 
 import logging
@@ -364,12 +365,14 @@ def analyze(questions):
 
         # print FOL statements
         # todo define variables (p, e, o); implicit (where - situations/activities);
-        #  define properties and constants; define relationships
+        #  define properties and constants; define relationships, comparison
         fol.print_logical_form()
 
 
         # generate GeoSPARQL queries from FOL statements (deps)
-        # todo
+        generator = SPARQLGenerator(fol.dependencies, fol.variables)
+
+        print(generator.to_SPARQL())
 
 
 analyze(questions)
