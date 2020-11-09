@@ -759,7 +759,7 @@ class FOLGenerator:
         if selected.role == '8':
             relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
             intent = Dependency(node1=first, relation=relation)
-            return intent
+            return [intent]
 
         seconds = search.findall(self.cons.root, filter_=lambda node: node.role in ['o', 'p',
                                                                                      'ACTION', 'EVENT', 'SITUATION'])
@@ -796,7 +796,7 @@ class FOLGenerator:
                 first.name = first.name.split()[1]
             relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link=first.name.upper(), nodeType='RELATION')
         intent = Dependency(node1=first, relation=relation, node2=second)
-        return intent
+        return [intent]
 
     def print_dependencies(self):
         for k, v in self.dependencies.items():
@@ -806,8 +806,9 @@ class FOLGenerator:
     def print_logical_form(self):
         # intent
         logical_form = ''
-        intent = self.dependencies['intent']
+        intent = self.dependencies['intent'][0]
         complex_intents = self.apply_conjunction_intent()
+        self.dependencies['intent'].extend(complex_intents)
         if intent.arg1.role == '8':
             if intent.arg2 is not None:
                 logical_form += chr(FOLGenerator.SPECIAL_CHARS['existential']) + ' ' + intent.arg2.name
@@ -894,7 +895,7 @@ class FOLGenerator:
 
     def apply_conjunction_intent(self):
         result = []
-        intent = self.dependencies['intent']
+        intent = self.dependencies['intent'][0]
         if intent.arg2 is None:
             return result
         name = intent.arg2.name
