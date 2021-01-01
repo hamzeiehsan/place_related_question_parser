@@ -101,6 +101,7 @@ class PlaceQuestionParseTree:
         for named_object in named_objects:
             if len(named_object.siblings) == 1 and (named_object.siblings[0].nodeType == 'DT'):
                 named_object.parent.role = named_object.role
+                named_object.parent.name = named_object.name
                 named_object.parent.nodeType = named_object.nodeType
                 named_object.parent.children = []
             elif len(named_object.siblings) == 1 and named_object.siblings[0].role == named_object.role:
@@ -716,6 +717,7 @@ class FOLGenerator:
         self.declare()
         self.dependencies['criteria'] = []
         self.extract_conjunctions()
+        self.extract_property_relationships()
         self.extract_spatiotemporal_relationships()
         self.extract_quality_relations()
         self.extract_comparisons()
@@ -799,9 +801,14 @@ class FOLGenerator:
         return [intent]
 
     def print_dependencies(self):
+        str_deps = ''
         for k, v in self.dependencies.items():
             print(k)
+            str_deps+=k+'\n'
             print('value: \n'+str(v))
+            str_deps+=str(v)+'\n'
+
+        return str_deps
 
     def print_logical_form(self):
         # intent
@@ -857,6 +864,8 @@ class FOLGenerator:
 
         print(logical_form)
         print()
+        return logical_form
+
 
     def generate_FOL_criterion(self, criterion, logical_form, last=False):
         # if criterion.arg1.name in self.variables.keys():
@@ -1169,6 +1178,24 @@ class FOLGenerator:
                         self.dependencies['criteria'][len(self.dependencies['criteria'])-1].extra.append(extra)
 
 
+    def extract_property_relationships(self):
+        non_spatial_prepositions = search.findall(self.dep.root, filter_=lambda node: node.link == 'prep' and
+                                                                                 node.role == '')
+        for p in non_spatial_prepositions:
+            first = None
+            second = None
+            relation = None
+            if p.parent is not None and p.parent.role == 'o':
+                first = PlaceDependencyTree.clone_node_without_children(p.parent)
+            for child in p.children:
+                if child.role in ['p', 'P']:
+                    second = PlaceDependencyTree.clone_node_without_children(child)
+            if first is not None and second is not None:
+                relation = AnyNode(name=p.name, spans=[{}], attributes=None, link='PROPERTY',
+                                           nodeType='RELATION')
+                self.dependencies['criteria'].append(Dependency(first, relation, second))
+
+
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
      'km', 'm', 'mi', 'yard', 'hectare']
@@ -1247,6 +1274,22 @@ class PlaceDependencyTree:
                 for child in children:
                     if child.parent is not None:
                         child.parent = selected
+
+        stop_words = search.findall(self.root, filter_=lambda node: node.name in ['the', 'a', 'an'] and
+                                                                    node.nodeType == 'DT')
+        for stop_word in stop_words:
+            if len(stop_word.children) == 0:
+                stop_word.parent = None
+            else:
+                parent = stop_word.parent
+                children = stop_word.children
+                new_children = []
+                for sibling in parent.children:
+                    if sibling == stop_word:
+                        new_children.extend(children)
+                    else:
+                        new_children.append(sibling)
+                parent.children = new_children
 
     def detect_conjunctions(self):
         conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)

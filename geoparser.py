@@ -277,11 +277,23 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
 questions = load_dataset('data/datasets/GeoQuestion201.csv')
-questions = load_dummy_dataset()  # if you want to just test! check the function...
+# questions = load_dummy_dataset()  # if you want to just test! check the function...
+
+
+def append_to_file(string):
+    with open('console.txt', 'a') as redf:
+        redf.write(string)
+
+
+def clean_file():
+    with open('console.txt', 'w') as redf:
+        redf.write("")
 
 
 def analyze(questions):
+    clean_file()
     for question in questions:
+        console = '*********************************************\n'
         # extract NER using fine-grained NER model
         result = extract_information(question, pt_set, et_set)
         logging.info('NER extracts: \n'+str(result))
@@ -307,6 +319,7 @@ def analyze(questions):
 
         ners = construct_cleaning_labels(result, question)
         logging.info('clean ners:\n'+str(ners))
+        console+=str(ners)+'\n'
 
         for k,v in ners.items():
             tree.label_role(re.split('--', k.strip())[0], v['role'], clean=True)
@@ -343,6 +356,7 @@ def analyze(questions):
         logging.info('constituency tree:\n' + str(tree))
         labelled = clean_extracted_info(labelled)
         logging.info('encoded elements:\n' + str(labelled))
+        console += str(tree) + '\n'
 
         # construct dependency tree, cleaning
         d_tree = DPARSER.construct_tree(question)
@@ -350,6 +364,7 @@ def analyze(questions):
 
         d_tree.clean_d_tree(labelled)
         logging.info('refined dependency tree:\n'+str(d_tree))
+        console += str(d_tree) + '\n'
 
         # use FOLGenerator to detect dependencies inside both parsing trees
         # intent recognition
@@ -357,17 +372,20 @@ def analyze(questions):
         fol = FOLGenerator(cons_tree=tree, dep_tree=d_tree)
         fol.generate_dependencies()
 
-        fol.print_dependencies()
+        dep_strings = fol.print_dependencies()
+        console += dep_strings + '\n'
 
         # print FOL statements
         # todo define variables (p, e, o); implicit (where - situations/activities);
         #  define properties and constants; define relationships, comparison
-        fol.print_logical_form()
-
+        log_string =fol.print_logical_form()
+        console += log_string + '\n'
 
         # generate GeoSPARQL queries from FOL statements (deps)
         generator = SPARQLGenerator(fol.dependencies, fol.variables)
         print(generator.to_SPARQL())
+        console += generator.to_SPARQL()+'\n\n\n'
+        append_to_file(console)
 
 
 analyze(questions)
