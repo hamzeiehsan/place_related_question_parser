@@ -8,7 +8,7 @@ class SPARQLTemplates:
                'PREFIX owl:<http://www.w3.org/2002/07/owl#>\n\n'
 
     DEFINE_CONCEPT = '\t?<PI> a db:<CONCEPT> .\n' \
-                    '\t?<PI> db:has_name ?<PI>NAME; \n' \
+                    '\t?<PI> db:name ?<PI>NAME; \n' \
                     '\t\tgeosparql:hasGeometry ?<PI>GEOM. \n' \
                     '\tFILTER(regex(?<PI>NAME, \"<PIVALUE>\", \"i\" )) .\n'
 
@@ -17,8 +17,7 @@ class SPARQLTemplates:
 
     GENERAL_FORMAT_SIMPLE_FUNCTION = PREFIXES + "SELECT <FUNCTION> \n" \
                                                 "WHERE { \n" \
-                                                "<WHERE>}\n" \
-                                                " LIMIT <LIMIT>";
+                                                "<WHERE>}\n"
 
     GENERAL_FORMAT_SORT_FUNCTION = PREFIXES + "SELECT <PILIST> \n" \
                                               "WHERE { \n" \
@@ -29,7 +28,7 @@ class SPARQLTemplates:
 
     GENERAL_FORMAT = PREFIXES + "SELECT <PILIST> \n" \
                                 "WHERE { \n<WHERE>" \
-                                "}\n LIMIT <LIMIT>"
+                                "}\n"
 
     DEFINE_TYPE = '\t?<PI> db:type ?<PI>TYPE;\n' \
                   '\t\tgeosparql:hasGeometry ?<PI>GEOM;\n' \
@@ -48,7 +47,7 @@ class SPARQLTemplates:
 
     ATTRIBUTE_RELATION = '\t?<PI> db:has_<ATTRIBUTE> ?<OBJECT>.\n'
 
-    DISTANCE_ATTRIBUTE = '\t?<OBJECT> geof:distance(?<PI1>GEOM ?<PI2>GEOM units:<UNIT>).\n'
+    DISTANCE_ATTRIBUTE = '\t?<PI1>distance geof:distance(?<PI1>GEOM ?<PI2>GEOM units:meter).\n'
 
     DISTANCE_RELATIONSHIP = '\tFILTER(geof:distance(<PI1>GEOM, <PI2>GEOM, <UNIT>) < <DISTANCE>).\n'
 
@@ -61,7 +60,11 @@ class SPARQLTemplates:
                                 'east of': '\tFILTER (spatialF:eastGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'west of': '\tFILTER (spatialF:westGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'border': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'borders': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'cross': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'crosses': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'flow': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'flows': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'OTHER': '\tFILTER(geof:sfIntersects(<PI1>GEOM,<PI2>GEOM)).\n'}
 
 
@@ -87,12 +90,18 @@ class SPARQLGenerator:
         if len(intents) == 1 and intents[0].arg1.role == '8':
             template = SPARQLTemplates.GENERAL_FORMAT_ASK
         elif intents[0].arg1.role != '6':
+            sort = None
             for criterion in criteria:
                 if criterion.relation.link == 'SUPERLATIVE' and criterion.arg1.name in self.variables.keys():
                     template = SPARQLTemplates.GENERAL_FORMAT_SORT_FUNCTION
                     sort = self.construct_sort(criterion)
-                    if sort is not None:
-                        template = template.replace('<SORT>', sort).replace('<LIMIT>', '1')
+                elif criterion.relation.name in ['closest to', 'nearest to', 'farthest to'] and \
+                        criterion.relation.role == 'R':
+                    template = SPARQLTemplates.GENERAL_FORMAT_SORT_FUNCTION
+                    sort = self.construct_sort(criterion)
+
+            if sort is not None:
+                template = template.replace('<SORT>', sort).replace('<LIMIT>', '1')
 
         # use declaration to define vars in where-clause
         # use criteria to bound them in where-clause
@@ -132,11 +141,12 @@ class SPARQLGenerator:
         return template
 
     def construct_sort(self, superlative):
-        resolver = AdjectiveResolver(superlative.arg2.name)
+        if superlative.relation.role == 'R':
+            resolver = AdjectiveResolver(superlative.relation.name)
+        else:
+            resolver = AdjectiveResolver(superlative.arg2.name)
         var_id = self.variables[superlative.arg1.name]
         topic = resolver.get_type()
-        if resolver.is_distance():
-            return ''
         return 'ORDER BY '+resolver.asc_or_desc().upper()+'('+var_id+topic+')'
 
     @staticmethod
@@ -169,6 +179,9 @@ class SPARQLGenerator:
         if binary and not distance:
             if dependency.relation.name in SPARQLTemplates.SPATIAL_RELATION_MAPPING.keys():
                 template = SPARQLTemplates.SPATIAL_RELATION_MAPPING[dependency.relation.name]
+                template = template.replace("<PI1>", var1).replace("<PI2>", var2)
+            elif dependency.relation.name in ['closest to', 'nearest to', 'farthest to']:
+                template = SPARQLTemplates.DISTANCE_ATTRIBUTE
                 template = template.replace("<PI1>", var1).replace("<PI2>", var2)
         elif distance:
             template = SPARQLTemplates.DISTANCE_RELATIONSHIP

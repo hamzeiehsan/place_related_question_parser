@@ -36,7 +36,8 @@ class PlaceQuestionParseTree:
     def add_to_tree(self, node, parent):
         local_start = parent.name.find(node['word'])
         n = AnyNode(name=node['word'], nodeType=node['nodeType'], parent=parent, role='',
-                    spans={'start': parent.spans['start']+local_start, 'end': parent.spans['start']+local_start+len(node['word'])})
+                    spans={'start': parent.spans['start'] + local_start,
+                           'end': parent.spans['start'] + local_start + len(node['word'])})
         if 'children' in node.keys():
             for child in node['children']:
                 self.add_to_tree(child, n)
@@ -49,7 +50,7 @@ class PlaceQuestionParseTree:
             return "Empty Tree"
         res = ""
         for pre, fill, node in self.tree:
-            res += "%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.role)+"\n"
+            res += "%s%s (%s) {%s}" % (pre, node.name, node.nodeType, node.role) + "\n"
         return res
 
     def label_tree(self):
@@ -87,7 +88,7 @@ class PlaceQuestionParseTree:
                 else:
                     node.parent = None
                 selected.name = name
-                selected.spans = {'start': self.root.name.index(name), 'end': self.root.name.index(name)+len(name)}
+                selected.spans = {'start': self.root.name.index(name), 'end': self.root.name.index(name) + len(name)}
                 if question_words:
                     selected.nodeType = 'WH'
                 elif comparison:
@@ -112,14 +113,14 @@ class PlaceQuestionParseTree:
         res_relationships = {}
         for named_object in named_objects:
             for sibling in named_object.siblings:
-                if sibling.nodeType == 'IN' and named_object.parent.nodeType in ['PP', 'VP'] and\
+                if sibling.nodeType == 'IN' and named_object.parent.nodeType in ['PP', 'VP'] and \
                         sibling.name in PlaceQuestionParseTree.spatiotemporal_propositions:
                     if named_object.role == 'd':
                         sibling.role = 'r'
                         if sibling.name + '--' + str(sibling.spans['start']) not in res_relationships.keys():
-                            res_relationships[sibling.name+'--'+str(sibling.spans['start'])] = {
+                            res_relationships[sibling.name + '--' + str(sibling.spans['start'])] = {
                                 'start': sibling.spans['start'], 'end': sibling.spans['end'], 'role': 'r', 'pos': 'ADP'}
-                    else: # complex spatial relationship with ['of', 'from', 'to']
+                    else:  # complex spatial relationship with ['of', 'from', 'to']
                         sibling.role = 'R'
                         if sibling.name in ['of', 'to', 'from']:
                             for reg in PlaceQuestionParseTree.complex_spatial_propositions:
@@ -128,20 +129,22 @@ class PlaceQuestionParseTree:
                                 if regex_search is not None:
                                     res_relationships[self.root.name[
                                                       regex_search.regs[0][0]:regex_search.regs[0][1]]
-                                    +'--'+str(regex_search.regs[0][0])]={'start': regex_search.regs[0][0],
-                                                                    'end': regex_search.regs[0][1],
-                                                                    'role': 'R',
-                                                                    'pos': 'ADP'}
+                                                      + '--' + str(regex_search.regs[0][0])] = {
+                                        'start': regex_search.regs[0][0],
+                                        'end': regex_search.regs[0][1],
+                                        'role': 'R',
+                                        'pos': 'ADP'}
                                     self.label_complex_spatial_relationships(sibling, pattern)
                                 else:
-                                    if sibling.name + '--'+ str(sibling.spans['start']) not in res_relationships.keys():
-                                        res_relationships[sibling.name+'--'+str(sibling.spans['start'])
+                                    if sibling.name + '--' + str(
+                                            sibling.spans['start']) not in res_relationships.keys():
+                                        res_relationships[sibling.name + '--' + str(sibling.spans['start'])
                                                           ] = {'start': sibling.spans['start'],
-                                                                           'end': sibling.spans['end'],
-                                                                           'role': 'R', 'pos': 'ADP'}
+                                                               'end': sibling.spans['end'],
+                                                               'role': 'R', 'pos': 'ADP'}
                         else:
-                            if sibling.name + '--'+ str(sibling.spans['start']) not in res_relationships.keys():
-                                res_relationships[sibling.name+'--'+ str(sibling.spans['start'])
+                            if sibling.name + '--' + str(sibling.spans['start']) not in res_relationships.keys():
+                                res_relationships[sibling.name + '--' + str(sibling.spans['start'])
                                                   ] = {'start': sibling.spans['start'],
                                                        'end': sibling.spans['end'], 'role': 'R', 'pos': 'ADP'}
                     named_object.parent.role = 'LOCATION'
@@ -166,7 +169,8 @@ class PlaceQuestionParseTree:
             else:
                 nodes = PlaceQuestionParseTree.iterate_and_find(context, text)
                 new_node = AnyNode(name=text, nodeType='IN', role='R', spans={'start': nodes[0].spans['start'],
-                                                                              'end': nodes[len(nodes)-1].spans['end']})
+                                                                              'end': nodes[len(nodes) - 1].spans[
+                                                                                  'end']})
                 before = []
                 after = []
 
@@ -188,7 +192,7 @@ class PlaceQuestionParseTree:
                 while lastparent != context:
                     lastparent = lastparent.parent
                     for child in lastparent.children:
-                        if self.root.name.index(text)+len(text)<=self.root.name.index(child.name):
+                        if self.root.name.index(text) + len(text) <= self.root.name.index(child.name):
                             after.append(child)
                 context.children = []
                 for b in before:
@@ -214,8 +218,8 @@ class PlaceQuestionParseTree:
         return res
 
     def label_complex_comparison(self, reg_results, comparison, role):
-        contexts = search.findall(self.root, filter_=lambda node: node.spans['start']<=reg_results.regs[0][0] and
-                                 node.spans['end']>=reg_results.regs[0][1])
+        contexts = search.findall(self.root, filter_=lambda node: node.spans['start'] <= reg_results.regs[0][0] and
+                                                                  node.spans['end'] >= reg_results.regs[0][1])
         context = None
         vals = comparison.split()
         max_depth = -1
@@ -225,16 +229,16 @@ class PlaceQuestionParseTree:
                 max_depth = c.depth
         first = search.findall(context, filter_=lambda node: node.name == vals[0])[0]
 
-        if first.parent.children.index(first)+1 == len(first.parent.children):
+        if first.parent.children.index(first) + 1 == len(first.parent.children):
             return
-        elif first.parent.children[first.parent.children.index(first)+1].role not in ['p', 'e', 'o']:
+        elif first.parent.children[first.parent.children.index(first) + 1].role not in ['p', 'e', 'o']:
             return
 
         second = search.findall(context, filter_=lambda node: node.name == vals[1])[0]
         if first.parent != second.parent:
             second.parent.name = second.parent.name.replace(second.name, '').strip()
             second.parent = None
-            first.parent.name = first.parent.name + ' '+second.name
+            first.parent.name = first.parent.name + ' ' + second.name
             first.parent.spans = {'start': first.parent.spans['start'], 'end': second.spans['end']}
         first.name = comparison
         first.role = role
@@ -254,7 +258,7 @@ class PlaceQuestionParseTree:
                     PlaceQuestionParseTree.merge(node1=named_objects[1], node2=named_objects[0])
 
     def clean_phrases(self):
-        single_child_nodes = search.findall(self.root, filter_= lambda node: len(node.children) == 1)
+        single_child_nodes = search.findall(self.root, filter_=lambda node: len(node.children) == 1)
         for node in single_child_nodes:
             try:
                 if node.role == '':
@@ -266,10 +270,10 @@ class PlaceQuestionParseTree:
             except:
                 print('error in cleaning...')
 
-        incorrect_types = search.findall(self.root, filter_= lambda node: len(node.children) > 0 and
-                                         node.role in ['p', 'P'])
+        incorrect_types = search.findall(self.root, filter_=lambda node: len(node.children) > 0 and
+                                                                         node.role in ['p', 'P'])
         for it in incorrect_types:
-            if len(search.findall(it, filter_= lambda node: node != it and node.role in ['p', 'P'])) == 0:
+            if len(search.findall(it, filter_=lambda node: node != it and node.role in ['p', 'P'])) == 0:
                 it.role = ''
 
     @staticmethod
@@ -306,7 +310,7 @@ class PlaceQuestionParseTree:
 
     def label_non_platial_objects(self):
         npos = search.findall(self.root, filter_=lambda node: node.nodeType.startswith('N') and
-                                                       node.role == '' and len(node.children) == 0)
+                                                              node.role == '' and len(node.children) == 0)
         res = {}
         for npo in npos:
             npo.role = 'o'
@@ -318,20 +322,20 @@ class PlaceQuestionParseTree:
             if parent is not None:
                 all_objects = True
                 for child in parent.children:
-                    if child.role != 'o' and child.nodeType != 'DT' and  child.role != 'p':
+                    if child.role != 'o' and child.nodeType != 'DT' and child.role != 'p':
                         all_objects = False
                 if all_objects:
                     parent.role = 'o'
                     parent.children = []
-                    res[parent.name+'--'+str(parent.spans['start'])] = {'start': parent.spans['start'],
-                                        'end':parent.spans['end'],
-                                        'role': 'o',
-                                        'pos': 'NOUN'}
+                    res[parent.name + '--' + str(parent.spans['start'])] = {'start': parent.spans['start'],
+                                                                            'end': parent.spans['end'],
+                                                                            'role': 'o',
+                                                                            'pos': 'NOUN'}
                 else:
-                    res[npo.name+'--'+str(npo.spans['start'])] = {'start': npo.spans['start'],
-                                        'end': npo.spans['end'],
-                                        'role': npo.role,
-                                        'pos': 'NOUN'}
+                    res[npo.name + '--' + str(npo.spans['start'])] = {'start': npo.spans['start'],
+                                                                      'end': npo.spans['end'],
+                                                                      'role': npo.role,
+                                                                      'pos': 'NOUN'}
         return res
 
     def get_verbs(self):
@@ -344,17 +348,19 @@ class PlaceQuestionParseTree:
 
     def label_situation_activities(self, verbs, decisions):
         res = {}
-        verb_nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("VB") and node.name in verbs)
+        verb_nodes = search.findall(self.root,
+                                    filter_=lambda node: node.nodeType.startswith("VB") and node.name in verbs)
         for i in range(len(verbs)):
             node = verb_nodes[i]
             decision = decisions[i]
             if decision != 'u':
                 node.role = decision
-                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'], 'end': node.spans['end'],
-                                  'role': node.role, 'pos': 'VERB'}
+                res[node.name + '--' + str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                    'end': node.spans['end'],
+                                                                    'role': node.role, 'pos': 'VERB'}
             else:
                 print("this verb is suspicious: " + str(node.name))
-        situations = search.findall(self.root, filter_=lambda  node: node.role == 's')
+        situations = search.findall(self.root, filter_=lambda node: node.role == 's')
         for situation in situations:
             for sibiling in situation.siblings:
                 if sibiling.role == '' and sibiling.nodeType == 'PP':
@@ -370,8 +376,9 @@ class PlaceQuestionParseTree:
         return res
 
     def label_events_actions(self):
-        nodes = search.findall(self.root, filter_=lambda node:node.nodeType.startswith("V") and 'P' in node.nodeType and
-                        node.role == '')
+        nodes = search.findall(self.root,
+                               filter_=lambda node: node.nodeType.startswith("V") and 'P' in node.nodeType and
+                                                    node.role == '')
         for node in nodes:
             actions = 0
             events = 0
@@ -387,7 +394,7 @@ class PlaceQuestionParseTree:
 
     def label_numeric_values(self):
         nodes = search.findall(self.root, filter_=lambda node: node.nodeType == 'CD' and node.role == '' and
-                               len(node.children) == 0)
+                                                               len(node.children) == 0)
         for node in nodes:
             node.role = 'n'
 
@@ -398,27 +405,28 @@ class PlaceQuestionParseTree:
         for node in nodes:
             if node.name in ['and', 'both']:
                 node.role = '&'
-                res[node.name+'--'+str(node.spans['start'])] = {'start':node.spans['start'],
-                                                                'end': node.spans['end'], 'role': node.role,
-                                                                'pos':'CCONJ'}
+                res[node.name + '--' + str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                    'end': node.spans['end'], 'role': node.role,
+                                                                    'pos': 'CCONJ'}
             elif node.name in ['or', 'whether']:
                 node.role = '|'
-                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'],
-                                                                'end': node.spans['end'], 'role': node.role,
-                                                                'pos': 'CCONJ'}
+                res[node.name + '--' + str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                    'end': node.spans['end'], 'role': node.role,
+                                                                    'pos': 'CCONJ'}
             elif node.name in ['not', 'neither', 'nor', 'but', 'except']:
                 node.role = '!'
-                res[node.name+'--'+str(node.spans['start'])] = {'start': node.spans['start'],
-                                                                'end': node.spans['end'], 'role': node.role,
-                                                                'pos': 'SCONJ'}
+                res[node.name + '--' + str(node.spans['start'])] = {'start': node.spans['start'],
+                                                                    'end': node.spans['end'], 'role': node.role,
+                                                                    'pos': 'SCONJ'}
 
             siblings = search.findall(node.parent, filter_=lambda node: node.role not in ('&', '|', '!', 'q') and
-                                      node.nodeType != 'DT' and (node.role != '' or node.nodeType == ','))
+                                                                        node.nodeType != 'DT' and (
+                                                                                    node.role != '' or node.nodeType == ','))
             sibling_roles = set()
             for sibling in siblings:
                 if sibling.nodeType == ',':
                     sibling.role = node.role
-                    res[sibling.name+'--'+str(sibling.spans['start'])] = {
+                    res[sibling.name + '--' + str(sibling.spans['start'])] = {
                         'start': sibling.spans['start'], 'end': sibling.spans['end'], 'role': sibling.role,
                         'pos': res[node.name]['pos']}
                 else:
@@ -429,7 +437,7 @@ class PlaceQuestionParseTree:
         return res
 
     def label_numbers(self):
-        numbers = search.findall(self.root, filter_= lambda node: node.role == '' and node.nodeType == 'CD')
+        numbers = search.findall(self.root, filter_=lambda node: node.role == '' and node.nodeType == 'CD')
         units = {}
         for num in numbers:
             num.role = 'n'
@@ -441,11 +449,12 @@ class PlaceQuestionParseTree:
                 elif check and sibling.name in PlaceDependencyTree.UNITS:
                     if num.parent.role == '':
                         num.parent.role = 'MEASURE'
-                    if num.name+' '+sibling.name in self.root.name:
-                        units[num.name+' '+sibling.name+'--'+str(num.spans['start'])] = {'start':num.spans['start'],
-                                                            'end': sibling.spans['end']+1,
-                                                            'role': 'n',
-                                                            'pos': 'NUM'}
+                    if num.name + ' ' + sibling.name in self.root.name:
+                        units[num.name + ' ' + sibling.name + '--' + str(num.spans['start'])] = {
+                            'start': num.spans['start'],
+                            'end': sibling.spans['end'] + 1,
+                            'role': 'n',
+                            'pos': 'NUM'}
                         added = True
             if not added and num.parent.nodeType == 'QP' and num.parent.parent is not None:
                 found = False
@@ -454,34 +463,35 @@ class PlaceQuestionParseTree:
                         found = True
                     elif found and child.name in PlaceDependencyTree.UNITS:
                         new_node = AnyNode(child.parent, role='MESAURE', name=num.name + ' ' + child.name,
-                                           nodeType='NP', spans= {
+                                           nodeType='NP', spans={
                                 'start': self.root.name.index(num.name + ' ' + child.name),
-                                'end': self.root.name.index(num.name + ' ' + child.name)+
+                                'end': self.root.name.index(num.name + ' ' + child.name) +
                                        len(num.name + ' ' + child.name)
                             })
                         num.parent = new_node
                         child.parent = new_node
-                        units[new_node.name+'--'+str(new_node.spans['start'])] = {'start': new_node.spans['start'],
-                                                'end': new_node.spans['end'],
-                                                'role': 'n',
-                                                'pos': 'NUM'
-                                                }
+                        units[new_node.name + '--' + str(new_node.spans['start'])] = {'start': new_node.spans['start'],
+                                                                                      'end': new_node.spans['end'],
+                                                                                      'role': 'n',
+                                                                                      'pos': 'NUM'
+                                                                                      }
             else:
-                units[num.name+'--'+str(num.spans['start'])] = {'start': num.spans['start'],
-                                        'end': num.spans['end'],
-                                        'role': 'n',
-                                        'pos': 'NUM'
-                                        }
+                units[num.name + '--' + str(num.spans['start'])] = {'start': num.spans['start'],
+                                                                    'end': num.spans['end'],
+                                                                    'role': 'n',
+                                                                    'pos': 'NUM'
+                                                                    }
         return units
 
     def label_qualities(self):
         compounds = {}
-        adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('AD'))
+        adjectives = search.findall(self.root, filter_=lambda node: node.nodeType.startswith('AD'))
         for adj in adjectives:
-            if len(search.findall(adj, filter_= lambda node: node.nodeType in ['CC', 'NP', 'NNS', 'NN'])) == 0:
+            if len(search.findall(adj, filter_=lambda node: node.nodeType in ['CC', 'NP', 'NNS', 'NN'])) == 0:
                 res = PlaceQuestionParseTree.label_adjective_roles(adj)
                 compounds = {**compounds, **res}
-        other_adjectives = search.findall(self.root, filter_= lambda node: node.nodeType.startswith('J') and node.parent.role == '')
+        other_adjectives = search.findall(self.root,
+                                          filter_=lambda node: node.nodeType.startswith('J') and node.parent.role == '')
         for adj in other_adjectives:
             res = PlaceQuestionParseTree.label_adjective_roles(adj)
             compounds = {**compounds, **res}
@@ -507,14 +517,14 @@ class PlaceQuestionParseTree:
                 else:
                     print('unresolved adjective! ' + adj.name + ' ' + child.name)
                 # if ' ' in adj.name:
-                compounds[adj.name+'--'+str(adj.spans['start'])] = {'start': adj.spans['start'],
-                                      'end': adj.spans['end'],
-                                       'role':adj.role, 'pos':'ADJ'}
+                compounds[adj.name + '--' + str(adj.spans['start'])] = {'start': adj.spans['start'],
+                                                                        'end': adj.spans['end'],
+                                                                        'role': adj.role, 'pos': 'ADJ'}
                 break
-            elif found and child.nodeType in['PP', 'IN']:
+            elif found and child.nodeType in ['PP', 'IN']:
                 if child.nodeType == 'IN':
                     adj.parent = None
-                    child.name = adj.name+' '+child.name
+                    child.name = adj.name + ' ' + child.name
                     if child.name.endswith('than'):
                         child.role = '<>'
                         compounds[child.name + '--' + str(child.spans['start'])] = {'start': child.spans['start'],
@@ -523,28 +533,28 @@ class PlaceQuestionParseTree:
                 elif child.nodeType == 'PP' and child.children[0].nodeType == 'IN':
                     if adj.parent is not None and len(adj.parent.children) == 2:
                         child.parent = adj.parent
-                        child.name = adj.name + ' '+ child.name
-                        child.spans = {'start':adj.spans['start'], 'end':child.spans['end']}
+                        child.name = adj.name + ' ' + child.name
+                        child.spans = {'start': adj.spans['start'], 'end': child.spans['end']}
                         adj.parent = None
-                        child.children[0].name = adj.name+' '+child.children[0].name
+                        child.children[0].name = adj.name + ' ' + child.children[0].name
                         child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
                         if child.children[0].name.endswith('than'):
                             child.children[0].role = '<>'
-                            compounds[child.children[0].name+'--'+str(child.children[0].spans['start'])] = {
+                            compounds[child.children[0].name + '--' + str(child.children[0].spans['start'])] = {
                                 'start': child.children[0].spans['start'], 'end': child.children[0].spans['end'],
-                                'role':child.children[0].role, 'pos':'ADJ'}
+                                'role': child.children[0].role, 'pos': 'ADJ'}
                     else:
                         adj.parent = None
                         child.children[0].name = adj.name + ' ' + child.children[0].name
                         child.children[0].spans = {'start': adj.spans['start'], 'end': child.children[0].spans['end']}
                         if child.children[0].name.endswith('than'):
                             child.children[0].role = '<>'
-                            compounds[child.children[0].name+'--'+str(child.children[0].spans['start'])] = {
+                            compounds[child.children[0].name + '--' + str(child.children[0].spans['start'])] = {
                                 'start': child.children[0].spans['start'],
                                 'end': child.children[0].spans['end'],
-                                'role':child.children[0].role, 'pos':'ADJ'}
+                                'role': child.children[0].role, 'pos': 'ADJ'}
                 else:
-                    print('unresolved adjective '+ adj.name + ' ' + child.name)
+                    print('unresolved adjective ' + adj.name + ' ' + child.name)
         return compounds
 
     @staticmethod
@@ -689,17 +699,18 @@ class Dependency:
         return True
 
     def __repr__(self):
-        string = '\n'+str(self.relation)+':\n\t'+str(self.arg1)
+        string = '\n' + str(self.relation) + ':\n\t' + str(self.arg1)
         if self.is_binary():
-            string += '\n\t'+str(self.arg2)
+            string += '\n\t' + str(self.arg2)
         for ex in self.extra:
-            string += '\n\t\t'+str(ex)
+            string += '\n\t\t' + str(ex)
         return string
 
 
 class FOLGenerator:
     CONCEPTS = {'P': 'PLACE', 'E': 'EVENT', 'L': 'LOCATION', 'd': 'DATE'}
     SPECIAL_CHARS = {'and': 8743, 'or': 8744, 'not': 172, 'implies': 8658, 'universal': 8704, 'existential': 8707}
+
     # e.g., result = chr(SPECIAL_CHARS['existential'])+' x0: Place(Tehran) '
     # +chr(SPECIAL_CHARS['and'])+' IN(x0, Tehran) '+chr(SPECIAL_CHARS['and'])+' City(x0)'
 
@@ -709,6 +720,7 @@ class FOLGenerator:
         self.dependencies = {}
         self.variables = {}
         self.constants = []
+        self.dep_places = []
 
     def generate_dependencies(self):
         self.dependencies['intent'] = self.extract_intent_dependency()
@@ -721,6 +733,7 @@ class FOLGenerator:
         self.extract_spatiotemporal_relationships()
         self.extract_quality_relations()
         self.extract_comparisons()
+        self.extract_situations()
         return self.dependencies
 
     def declare(self):
@@ -738,14 +751,14 @@ class FOLGenerator:
         for generic in generics:
             first = PlaceDependencyTree.clone_node_without_children(generic)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
-            second = AnyNode(name='x'+str(var_id), spans=[{}], attributes=None,
+            second = AnyNode(name='x' + str(var_id), spans=[{}], attributes=None,
                              link=generic.name, nodeType='VARIABLE')
             self.dependencies['declaration'].append(Dependency(first, relation, second))
-            self.variables[first.name] = 'x'+str(var_id)
-            var_id+=1
+            self.variables[first.name] = 'x' + str(var_id)
+            var_id += 1
 
     def extract_intent_dependency(self):
-        question_words = search.findall(self.cons.root, filter_= lambda node: node.nodeType == 'WH')
+        question_words = search.findall(self.cons.root, filter_=lambda node: node.nodeType == 'WH')
         selected = None
         if len(question_words) > 1:
             min_start = 1000
@@ -764,7 +777,7 @@ class FOLGenerator:
             return [intent]
 
         seconds = search.findall(self.cons.root, filter_=lambda node: node.role in ['o', 'p',
-                                                                                     'ACTION', 'EVENT', 'SITUATION'])
+                                                                                    'ACTION', 'EVENT', 'SITUATION'])
         what = None
         if len(seconds) == 0:
             seconds = search.findall(self.cons.root, filter_=lambda node: node.role == 'P')
@@ -791,7 +804,7 @@ class FOLGenerator:
         second = PlaceDependencyTree.clone_node_without_children(what, cons_tree=True)
         if selected.role == '1':  # where questions
             relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='LOCATION', nodeType='RELATION')
-        elif selected.role == '6': # how many
+        elif selected.role == '6':  # how many
             relation = AnyNode(name='INTENT', spans=[{}], attributes=None, link='COUNT', nodeType='RELATION')
         else:
             if ' ' in first.name:
@@ -804,9 +817,9 @@ class FOLGenerator:
         str_deps = ''
         for k, v in self.dependencies.items():
             print(k)
-            str_deps+=k+'\n'
-            print('value: \n'+str(v))
-            str_deps+=str(v)+'\n'
+            str_deps += k + '\n'
+            print('value: \n' + str(v))
+            str_deps += str(v) + '\n'
 
         return str_deps
 
@@ -820,17 +833,17 @@ class FOLGenerator:
             if intent.arg2 is not None:
                 logical_form += chr(FOLGenerator.SPECIAL_CHARS['existential']) + ' ' + intent.arg2.name
                 for i in complex_intents:
-                    logical_form+= ', '+i.arg2.name
+                    logical_form += ', ' + i.arg2.name
         elif intent.arg1.role == '6' or intent.arg1.role == '1':  # how many, where
             logical_form += intent.relation.link + '(' + intent.arg2.name + ')'
             for i in complex_intents:
-                logical_form+= ', '+intent.relation.link + '(' + i.arg2.name + ')'
+                logical_form += ', ' + intent.relation.link + '(' + i.arg2.name + ')'
         else:
             logical_form += intent.arg2.name
             for i in complex_intents:
-                logical_form+= ', '+i.arg2.name
+                logical_form += ', ' + i.arg2.name
         if logical_form != '':
-            logical_form+=': '
+            logical_form += ': '
 
         # declarations
         declarations = self.dependencies['declaration']
@@ -856,7 +869,7 @@ class FOLGenerator:
                 logical_form = self.generate_FOL_criterion(criterion, logical_form)
                 counter += 1
 
-        if logical_form.endswith(chr(FOLGenerator.SPECIAL_CHARS['and'])+' '):
+        if logical_form.endswith(chr(FOLGenerator.SPECIAL_CHARS['and']) + ' '):
             logical_form = logical_form[0: len(logical_form) - 2]
 
         for key, var in self.variables.items():
@@ -866,7 +879,6 @@ class FOLGenerator:
         print()
         return logical_form
 
-
     def generate_FOL_criterion(self, criterion, logical_form, last=False):
         # if criterion.arg1.name in self.variables.keys():
         #     criterion.arg1.name = self.variables[criterion.arg1.name]
@@ -874,20 +886,20 @@ class FOLGenerator:
         #     criterion.arg2.name = self.variables[criterion.arg2.name]
 
         if criterion.relation.link in ['PROPERTY', 'NOT']:
-            logical_form += criterion.relation.name.upper().replace(' ', '_')+ '(' + criterion.arg1.name
+            logical_form += criterion.relation.name.upper().replace(' ', '_') + '(' + criterion.arg1.name
             if criterion.arg2 is not None:
-                logical_form += ', '+criterion.arg2.name
-            logical_form+= ') '
+                logical_form += ', ' + criterion.arg2.name
+            logical_form += ') '
 
         elif criterion.relation.link == 'SUPERLATIVE':
             if criterion.arg1.name in self.variables.keys():
-                logical_form = logical_form.replace(criterion.arg1.name, criterion.arg2.name.replace(' ', '_').upper()+
-                                     '('+criterion.arg1.name+')', 1)
+                logical_form = logical_form.replace(criterion.arg1.name, criterion.arg2.name.replace(' ', '_').upper() +
+                                                    '(' + criterion.arg1.name + ')', 1)
                 if last:
-                    logical_form = logical_form[0: len(logical_form) -2]
+                    logical_form = logical_form[0: len(logical_form) - 2]
                 last = True
             else:
-                logical_form += criterion.arg2.name.replace(' ', '_').upper()+ '('+criterion.arg1.name+') '
+                logical_form += criterion.arg2.name.replace(' ', '_').upper() + '(' + criterion.arg1.name + ') '
         else:  # other
             logical_form += criterion.relation.name.upper().replace(' ', '_') + '(' + criterion.arg1.name
             if criterion.arg2 is not None:
@@ -895,7 +907,7 @@ class FOLGenerator:
             extra = ''
             for ex in criterion.extra:
                 logical_form += ', ' + ex.name
-                extra += ex.name+' '
+                extra += ex.name + ' '
             logical_form += ') '
             logical_form = logical_form.replace(extra.upper().replace(" ", "_"), '')
         if not last:
@@ -973,9 +985,9 @@ class FOLGenerator:
         self.dependencies['criteria'].extend(new_criteria)
 
     def extract_comparisons(self):
-        comps = search.findall(self.cons.root, filter_= lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
+        comps = search.findall(self.cons.root, filter_=lambda node: node.role in ['>', '<', '<>', '=', '>=', '<='])
         for comp in comps:
-            d_comp = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == comp.name.strip())
+            d_comp = search.findall(self.dep.root, filter_=lambda node: node.name.strip() == comp.name.strip())
             if len(d_comp) != 1:
                 continue
             d_comp = d_comp[0]
@@ -997,7 +1009,7 @@ class FOLGenerator:
             left = d_comp.parent
             while left is not None and left.parent is not None and left.role not in ['p', 'P', 's', 'o']:
                 left = left.parent
-            if (left is None or left.role not in ['p', 'P', 's', 'o'])\
+            if (left is None or left.role not in ['p', 'P', 's', 'o']) \
                     and len(d_comp.children) > 0:  # pattern 2 -- valid children[0][0]...
                 left = d_comp.children[0]
                 while len(left.children) > 0 and left.role not in ['p', 'P', 's', 'o']:
@@ -1009,27 +1021,75 @@ class FOLGenerator:
             relation = PlaceDependencyTree.clone_node_without_children(comp, cons_tree=True)
             self.dependencies['criteria'].append(Dependency(first, relation, second))
 
+    def extract_situations(self):
+        situations = search.findall(self.dep.root, filter_=lambda node: node.role == 's')
+        for situation in situations:
+            first = None
+            second = None
+            relation = None
+            if situation.name in ['is', 'are', 'located', 'do', 'dose']:
+                continue
+            elif situation.name in ['have', 'has']:
+                nsubjects = search.findall(situation, filter_=lambda node: node.nodeType == 'nsubject')
+                if len(nsubjects) == 2:
+                    # implicit spatial relationships
+                    if nsubjects[0].role in ['P', 'p'] and nsubjects[1].role in ['P', 'p']:
+                        if nsubjects[0].role == 'p':
+                            first = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
+                            second = PlaceDependencyTree.clone_node_without_children(nsubjects[1])
+                        elif nsubjects[1].role == 'p':
+                            first = PlaceDependencyTree.clone_node_without_children(nsubjects[1])
+                            second = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
+                        if first is not None and second is not None:
+                            relation = AnyNode(name='in', spans=[{}], attributes=None, link='prep', role='R',
+                                               nodeType='dep')
+                    # situation + object (attribute) + place
+                    elif (nsubjects[0].role in ['P', 'p'] and nsubjects[1].role in ['o']) or \
+                            (nsubjects[1].role in ['P', 'p'] and nsubjects[0].role in ['o']):
+                        relation = PlaceDependencyTree.clone_node_without_children(situation)
+            elif situation.name in ['border', 'borders', 'cross', 'crosses', 'flow', 'flows']:
+                relation = AnyNode(name=situation.name, spans=[{}], attributes=None, link='prep', role='R',
+                                               nodeType='dep')
+                generic_places = search.findall(self.dep.root, filter_= lambda node: node.role == 'p')
+                if len(generic_places) == 2:
+                    first = PlaceDependencyTree.clone_node_without_children(generic_places[0])
+                    second = PlaceDependencyTree.clone_node_without_children(generic_places[1])
+                elif len(generic_places) == 1:
+                    first = PlaceDependencyTree.clone_node_without_children(generic_places[0])
+                    specific_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'P')
+                    if len(specific_places) == 1:
+                        second = PlaceDependencyTree.clone_node_without_children(specific_places[0])
+                    elif len(specific_places) > 1:
+                        for place in specific_places:
+                            if place.name + ' '+ first.name not in self.dep_places and \
+                                    first.name + ' ' + place.name not in self.dep_places:
+                                second = PlaceDependencyTree.clone_node_without_children(specific_places[0])
+                                break
+
+            if first is not None and second is not None and relation is not None:
+                self.dependencies['criteria'].append(Dependency(first, relation, second))
+
     def extract_quality_relations(self):
-        qualities = search.findall(self.cons.root, filter_= lambda node: node.role in ['Q', 'q'])
+        qualities = search.findall(self.cons.root, filter_=lambda node: node.role in ['Q', 'q'])
         quality_map = {'Q': ['p', 'P'], 'q': ['e', 'E', 'o']}
         for q in qualities:
-            reference = search.findall(q.parent, filter_= lambda node: node.parent == q.parent and
-                                                                       node.role in quality_map[q.role])
+            reference = search.findall(q.parent, filter_=lambda node: node.parent == q.parent and
+                                                                      node.role in quality_map[q.role])
             if len(reference) == 0:
                 continue
             reference = reference[0]
-            d_q = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == q.name.strip())
+            d_q = search.findall(self.dep.root, filter_=lambda node: node.name.strip() == q.name.strip())
             if len(d_q) != 1:
                 continue
             d_q = d_q[0]
-            if q.nodeType == 'JJS' or len(q.children) > 0 and len(search.findall(q, filter_= lambda node:
+            if q.nodeType == 'JJS' or len(q.children) > 0 and len(search.findall(q, filter_=lambda node:
             node.nodeType in ['RBS', 'JJS'])) > 0:
-                first = PlaceDependencyTree.clone_node_without_children(reference, cons_tree= True)
+                first = PlaceDependencyTree.clone_node_without_children(reference, cons_tree=True)
                 second = PlaceDependencyTree.clone_node_without_children(d_q)
                 relation = AnyNode(name='IS/ARE', spans=[{}], attributes=None, link='SUPERLATIVE',
-                                           nodeType='RELATION')
+                                   nodeType='RELATION')
                 self.dependencies['criteria'].append(Dependency(first, relation, second))
-            elif q.role == 'JJR' or len(q.children) > 0 and len(search.findall(q, filter_= lambda node:
+            elif q.role == 'JJR' or len(q.children) > 0 and len(search.findall(q, filter_=lambda node:
             node.nodeType in ['RBR', 'JJR'])) > 0:
                 print('Comparative')
             else:
@@ -1041,16 +1101,16 @@ class FOLGenerator:
 
     def extract_conjunctions(self):
         and_or = ['&', '|']
-        conjs = search.findall(self.cons.root, filter_= lambda node: node.role in and_or)
+        conjs = search.findall(self.cons.root, filter_=lambda node: node.role in and_or)
         for conj in conjs:
-            siblings = search.findall(conj.parent, filter_= lambda node: node.parent == conj.parent and
-                           node.role in ['p', 'P', 'e', 'E'])
+            siblings = search.findall(conj.parent, filter_=lambda node: node.parent == conj.parent and
+                                                                        node.role in ['p', 'P', 'e', 'E'])
             pairs = []
             for s1 in siblings:
                 for s2 in siblings:
-                    if s1 != s2 and s1.name+' '+s2.name not in pairs:
-                        pairs.append(s1.name+' '+s2.name)
-                        pairs.append(s2.name+' '+s1.name)
+                    if s1 != s2 and s1.name + ' ' + s2.name not in pairs:
+                        pairs.append(s1.name + ' ' + s2.name)
+                        pairs.append(s2.name + ' ' + s1.name)
                         first = PlaceDependencyTree.clone_node_without_children(s1, cons_tree=True)
                         second = PlaceDependencyTree.clone_node_without_children(s2, cons_tree=True)
                         rel_name = FOLGenerator.SPECIAL_CHARS['and']
@@ -1060,13 +1120,15 @@ class FOLGenerator:
                                            nodeType='RELATION')
                         self.dependencies['criteria'].append(Dependency(first, relation, second))
         not_nor = ['!']
-        negations = search.findall(self.cons.root, filter_= lambda node: node.role in not_nor)
+        negations = search.findall(self.cons.root, filter_=lambda node: node.role in not_nor)
         for negation in negations:
-            next = search.findall(negation.parent, filter_= lambda node: node.parent == negation.parent and
-                                  node.spans['start'] > negation.spans['start'] and node.role in ['p', 'P', 'e', 'E'])
+            next = search.findall(negation.parent, filter_=lambda node: node.parent == negation.parent and
+                                                                        node.spans['start'] > negation.spans[
+                                                                            'start'] and node.role in ['p', 'P', 'e',
+                                                                                                       'E'])
             if len(next) > 0:
                 next = next[0]
-                d_conj = search.findall(self.dep.root, filter_= lambda node: node.name.strip() == negation.name.strip())
+                d_conj = search.findall(self.dep.root, filter_=lambda node: node.name.strip() == negation.name.strip())
                 if len(d_conj) == 1:
                     d_conj = d_conj[0]
                     if d_conj.parent.role in ['p', 'e']:
@@ -1081,11 +1143,12 @@ class FOLGenerator:
         for location in locations:
             done = False
             relationships = search.findall(location, filter_=lambda node: node.parent == location and
-                                          node.role in ['R', 'r'])
+                                                                          node.role in ['R', 'r'])
             anchors = search.findall(location, filter_=lambda node: node.role in ['p', 'P', 'd'])
             anchor_names = list(map(lambda node: node.name, anchors))
             first = None
             relation = None
+            second = None
             if len(relationships) == 0:
                 continue
             elif len(relationships) > 1:
@@ -1093,13 +1156,15 @@ class FOLGenerator:
             else:
                 relationship = relationships[0]
                 r_nodes = search.findall(self.dep.root, filter_=lambda node: node.name.strip() == relationship.name and
-                                                              node.spans[0]['start'] >= relationship.spans['start'] - 2
-                                                              and node.spans[0]['end'] <= relationship.spans['end'] + 3)
+                                                                             node.spans[0]['start'] >=
+                                                                             relationship.spans['start'] - 2
+                                                                             and node.spans[0]['end'] <=
+                                                                             relationship.spans['end'] + 3)
                 if len(r_nodes) != 1:
                     continue
                 r_node = r_nodes[0]
                 subjects = search.findall(self.dep.root, filter_=lambda node: node.role in ['p', 'P', 'e', 'E'] and
-                                          node.name not in anchor_names)
+                                                                              node.name not in anchor_names)
                 found = False
                 if r_node.parent is not None:
                     # pattern 1 -- sibling (before)
@@ -1124,7 +1189,7 @@ class FOLGenerator:
                 # pattern 3 -- child
                 if not found:
                     childs = search.findall(r_node, filter_=lambda node: node.role in ['P', 'p', 'E', 'e'] and
-                                            node.name not in anchor_names)
+                                                                         node.name not in anchor_names)
                     if len(childs) == 1:
                         first = PlaceDependencyTree.clone_node_without_children(childs[0])
 
@@ -1158,7 +1223,7 @@ class FOLGenerator:
                                 break
                     else:
                         if len(r_node.children) > 0:
-                            filtered = search.findall(r_node.children[0], filter_= lambda node:
+                            filtered = search.findall(r_node.children[0], filter_=lambda node:
                             node.role in ['p', 'P', 'e', 'E'] and node.name not in anchor_names)
                             if len(filtered) == 1:
                                 first = PlaceDependencyTree.clone_node_without_children(filtered[0])
@@ -1170,17 +1235,17 @@ class FOLGenerator:
                                     if len(locations) > 1:
                                         break
             if done:
+                self.dep_places.append(first.name + ' ' + second.name)
                 if len(relationship.children) > 0:
-                    measures = search.findall(relationship, filter_= lambda node: node.role == 'MEASURE')
+                    measures = search.findall(relationship, filter_=lambda node: node.role == 'MEASURE')
                     if len(measures) == 1:
                         measure = measures[0]
                         extra = PlaceDependencyTree.clone_node_without_children(measure, cons_tree=True)
-                        self.dependencies['criteria'][len(self.dependencies['criteria'])-1].extra.append(extra)
-
+                        self.dependencies['criteria'][len(self.dependencies['criteria']) - 1].extra.append(extra)
 
     def extract_property_relationships(self):
         non_spatial_prepositions = search.findall(self.dep.root, filter_=lambda node: node.link == 'prep' and
-                                                                                 node.role == '')
+                                                                                      node.role == '')
         for p in non_spatial_prepositions:
             first = None
             second = None
@@ -1192,13 +1257,13 @@ class FOLGenerator:
                     second = PlaceDependencyTree.clone_node_without_children(child)
             if first is not None and second is not None:
                 relation = AnyNode(name=p.name, spans=[{}], attributes=None, link='PROPERTY',
-                                           nodeType='RELATION')
+                                   nodeType='RELATION')
                 self.dependencies['criteria'].append(Dependency(first, relation, second))
 
 
 class PlaceDependencyTree:
     UNITS = ['meters', 'kilometers', 'miles', 'mile', 'meter', 'kilometer',
-     'km', 'm', 'mi', 'yard', 'hectare']
+             'km', 'm', 'mi', 'yard', 'hectare']
 
     def __init__(self, dependency_dict):
         self.dict = dependency_dict
@@ -1232,7 +1297,7 @@ class PlaceDependencyTree:
             return "Empty Tree"
         res = ""
         for pre, fill, node in self.tree:
-            res+="%s%s (%s) {%s} [%s]" % (pre, node.name, node.nodeType, node.attributes, node.role)+"\n"
+            res += "%s%s (%s) {%s} [%s]" % (pre, node.name, node.nodeType, node.attributes, node.role) + "\n"
         return res
 
     def detect_dependencies(self):
@@ -1246,7 +1311,9 @@ class PlaceDependencyTree:
     def clean_d_tree(self, str_dict):
         for k, v in str_dict.items():
             nodes = search.findall(self.root, filter_=lambda node: node.spans[0]['start'] >= v['start'] and
-            node.spans[0]['end'] <= v['end']+3 and node.name.strip() == re.split('--', k.strip())[0])
+                                                                   node.spans[0]['end'] <= v[
+                                                                       'end'] + 3 and node.name.strip() ==
+                                                                   re.split('--', k.strip())[0])
             if len(nodes) > 0:
                 for n in nodes:
                     n.role = v['role']
@@ -1292,22 +1359,25 @@ class PlaceDependencyTree:
                 parent.children = new_children
 
     def detect_conjunctions(self):
-        conjunctions = search.findall(self.root, filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
-                                                                      and node.nodeType in ['punct', 'dep', 'prep'])
+        conjunctions = search.findall(self.root,
+                                      filter_=lambda node: ('SCONJ' in node.attributes or 'CCONJ' in node.attributes)
+                                                           and node.nodeType in ['punct', 'dep', 'prep'])
         for conj in conjunctions:
             is_cc = 'CCONJ' in conj.attributes
             relation = PlaceDependencyTree.clone_node_without_children(conj)
             first = None
             if 'AUX' in conj.parent.attributes or 'VERB' in conj.parent.attributes:
-                temp = search.findall(conj.parent, filter_=lambda node: node.parent == conj.parent and node.link == 'nsubj')
+                temp = search.findall(conj.parent,
+                                      filter_=lambda node: node.parent == conj.parent and node.link == 'nsubj')
                 print(temp)
                 if len(temp) == 1:
                     first = PlaceDependencyTree.clone_node_without_children(temp[0])
             else:
                 first = PlaceDependencyTree.clone_node_without_children(conj.parent)
             if is_cc:
-                pairs = search.findall(conj.parent, filter_= lambda node: node.parent == conj.parent and
-                               conj.parent.attributes[0] in node.attributes and node.link == 'dep')
+                pairs = search.findall(conj.parent, filter_=lambda node: node.parent == conj.parent and
+                                                                         conj.parent.attributes[
+                                                                             0] in node.attributes and node.link == 'dep')
                 for pair in pairs:
                     if first is not None:
                         second = PlaceDependencyTree.clone_node_without_children(pair)
@@ -1315,7 +1385,8 @@ class PlaceDependencyTree:
                         self.dependencies.append(dep)
             else:
                 nodes = search.findall(conj, filter_=lambda node: node.link in ['dep', 'pobj'] and
-                                                           ('PROPN' in node.attributes or 'NOUN' in node.attributes))
+                                                                  (
+                                                                              'PROPN' in node.attributes or 'NOUN' in node.attributes))
                 for node in nodes:
                     if first is not None:
                         second = PlaceDependencyTree.clone_node_without_children(node)
@@ -1325,7 +1396,7 @@ class PlaceDependencyTree:
         excepts = search.findall(self.root, filter_=lambda node: node.nodeType == 'case' and 'ADP' in node.attributes)
         for ex in excepts:
             if ex.name in ['except', 'excluding']:
-                override = {'nodeType':'cc', 'attributes': ['SCONJ'], 'link':'conj'}
+                override = {'nodeType': 'cc', 'attributes': ['SCONJ'], 'link': 'conj'}
                 relation = PlaceDependencyTree.clone_node_without_children(ex, override)
                 first = PlaceDependencyTree.clone_node_without_children(ex.parent)
                 dep = Dependency(first, relation)
@@ -1333,14 +1404,16 @@ class PlaceDependencyTree:
 
     def detect_adjectives(self):
         adjectives = search.findall(self.root, filter_=lambda node: 'ADJ' in node.attributes and
-                                                                    node.link in ['amod', 'case', 'dep', 'pobj', 'root'])
+                                                                    node.link in ['amod', 'case', 'dep', 'pobj',
+                                                                                  'root'])
         for adj in adjectives:
             num_comparisons = search.findall(adj, filter_=lambda node: 'NUM' in node.attributes and
-                                                                       (node.parent == adj or node.parent.link in ['pobj', 'prep', 'dep']) )
+                                                                       (node.parent == adj or node.parent.link in [
+                                                                           'pobj', 'prep', 'dep']))
             noun_comparisons = search.findall(adj, filter_=lambda
                 node: ('PROPN' in node.attributes or 'NOUN' in node.attributes) and node.link == 'dep' and
                       (node.parent == adj or node.parent.link in ['prep']))
-            if len(num_comparisons) > 0: # value comparison
+            if len(num_comparisons) > 0:  # value comparison
                 for d in num_comparisons:
                     parent = PlaceDependencyTree.find_first_parent_based_on_attribute(adj, ['NOUN', 'PROPN'])
                     if parent is not None:
@@ -1350,7 +1423,7 @@ class PlaceDependencyTree:
                         dep = Dependency(first, relation, second)
                         self.dependencies.append(dep)
                     children = search.findall(d.parent, filter_=lambda node: node.link in ['dep', 'pobj'] and
-                                                                      node.name in PlaceDependencyTree.UNITS)
+                                                                             node.name in PlaceDependencyTree.UNITS)
                     for child in children:
                         first = PlaceDependencyTree.clone_node_without_children(d)
                         second = PlaceDependencyTree.clone_node_without_children(child)
@@ -1358,7 +1431,7 @@ class PlaceDependencyTree:
                         dep = Dependency(first, relation, second)
                         self.dependencies.append(dep)
 
-            elif len(noun_comparisons) > 0 and adj.parent is not None: # noun comparison
+            elif len(noun_comparisons) > 0 and adj.parent is not None:  # noun comparison
                 for n in noun_comparisons:
                     first = PlaceDependencyTree.clone_node_without_children(adj.parent)
                     relation = PlaceDependencyTree.clone_node_without_children(adj)
@@ -1369,17 +1442,19 @@ class PlaceDependencyTree:
                 relation = AnyNode(name='ADJ', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
                 dependency = None
                 if adj.parent is not None:
-                    dependency = search.findall(adj.parent, filter_=lambda node: (node.parent == adj.parent or node == adj.parent
-                                                                              or adj in node.ancestors)
-                                            and node.attributes[0] in ['NOUN', 'PROPN'])
+                    dependency = search.findall(adj.parent,
+                                                filter_=lambda node: (node.parent == adj.parent or node == adj.parent
+                                                                      or adj in node.ancestors)
+                                                                     and node.attributes[0] in ['NOUN', 'PROPN'])
                 else:
-                    dependency = search.findall(adj, filter_=lambda node: node.attributes[0] in ['NOUN', 'PROPN'] and node.parent == adj)
+                    dependency = search.findall(adj, filter_=lambda node: node.attributes[0] in ['NOUN',
+                                                                                                 'PROPN'] and node.parent == adj)
                 if len(dependency) == 1:
                     first = PlaceDependencyTree.clone_node_without_children(dependency[0])
                     dep = Dependency(first, relation, adj)
                     self.dependencies.append(dep)
                 else:
-                    print('error -- adjective with multiple deps '+str(adj))
+                    print('error -- adjective with multiple deps ' + str(adj))
 
             adverbs = search.findall(adj, filter_=lambda node: node.link in ['advmod', 'dep'] and
                                                                node.parent == adj and 'ADV' in node.attributes)
@@ -1404,13 +1479,13 @@ class PlaceDependencyTree:
                     self.dependencies.append(dep)
 
     def detect_units(self):
-        numbers = search.findall(self.root, filter_= lambda node: 'NUM' in node.attributes)
+        numbers = search.findall(self.root, filter_=lambda node: 'NUM' in node.attributes)
         for num in numbers:
             context = num.parent
             if context is None:
                 context = num
-            units = search.findall(context, filter_= lambda node: node.name in node.link in ['dep', 'pobj'] and
-                                                                  node.name in PlaceDependencyTree.UNITS)
+            units = search.findall(context, filter_=lambda node: node.name in node.link in ['dep', 'pobj'] and
+                                                                 node.name in PlaceDependencyTree.UNITS)
             selected = None
             if len(units) == 1:
                 selected = units[0]
@@ -1445,7 +1520,8 @@ class PlaceDependencyTree:
                 dep = Dependency(first, relation, second)
                 self.dependencies.append(dep)
 
-                modifiers = search.findall(prep.parent, filter_=lambda node: 'ADV' in node.attributes and len(node.children) == 0)
+                modifiers = search.findall(prep.parent,
+                                           filter_=lambda node: 'ADV' in node.attributes and len(node.children) == 0)
                 if len(modifiers) == 1:
                     relation = AnyNode(name='PRP', spans=[{}], attributes=None, link='IS/ARE', nodeType='RELATION')
                     second = PlaceDependencyTree.clone_node_without_children(modifiers[0])
@@ -1471,7 +1547,7 @@ class PlaceDependencyTree:
                 return AnyNode(name=node.name, spans=node.spans, attributes=[node.nodeType],
                                link='', nodeType=node.nodeType, role=node.role)
             return AnyNode(name=node.name, spans=node.spans, attributes=node.attributes,
-                       link=node.link, nodeType=node.nodeType, role=node.role)
+                           link=node.link, nodeType=node.nodeType, role=node.role)
         else:
             return AnyNode(name=node.name, spans=node.spans, attributes=override['attributes'],
                            link=override['link'], nodeType=override['nodeType'], role=node.role)

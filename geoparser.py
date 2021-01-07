@@ -52,49 +52,21 @@ def load_dataset(path):
 
 def load_dummy_dataset():
     questions = []
-    # questions.append("In what county is Stonehenge located")
-    questions.append("Which museums are within 3km of Saint George's Hotel in London?")
-    # questions.append("Which provinces of Ireland have population over 2000000?")
-    # questions.append("What is the population density of cities that are affected by the hurricanes in the USA in the last century")
-    # questions.append("Where can I buy coffee and watch movies in Melbourne?")
-    # questions.append("Where can I buy coffee and watch movies within five km of my house?")
-    # questions.append("What are the large cities in England except London?")
-    # questions.append("What is the land between Euphrates and Tigris")
-    # questions.append("What is the land between Black Sea, Black Forest and the Danube?")
-    # questions.append("Which counties of Ireland does River Shannon cross?")
-    # questions.append("What is the most populated city in the United Kingdom except London?")
-    # questions.append("Where can I buy the best coffee and see exotic birds near to the Australian National Maritime Museum?")
-    # questions.append("Is Mount Everest taller than 1000 miles?")
-    questions.append("Which tourist attractions in London are at most 3 km from St. Anthony the Great and St. John the Baptist church?")
-    # questions.append("Which rivers discharge into the Solway Firth?")
-    # questions.append("In which part of England is Liverpool located?")
-    # questions.append("What is the name of Britain's longest river?")
-    # questions.append("Which hotels are in England's capital?")
-    # questions.append("What tourist attractions are there in Belfast, Northern Ireland?")
-    questions.append("Which pubs are near Mercure Hotel in Glasgow, Scotland?")
-    # questions.append("Which are the main railway stations in Glasgow, Scotland?")
-    # questions.append("Which hospital is nearest to Calton Hill in Edinburgh?")
-    # questions.append("Which city of England is nearest to London?")
-    # questions.append("What is the name of the river that flows under the Queensway Bridge in Liverpool?")
-    # questions.append("Which cities or towns of the United Kingdom have a university?")
-    # questions.append("What is the longest river in England and Wales?")
-    # questions.append("What is the distance between Liverpool and Glasgow?")
-    # questions.append("Are there any rivers that cross both England and Wales?")
-    # questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and "
-    #                  "St. John the Baptist church?")
-    # questions.append("What is the most populated city in the United Kingdom except London?")
-    # questions.append("Where is the closest market to Elephant and Castle underground station?")
-    questions.append("Which is the highest building in London?")
-    # questions.append("What is the longest bridge in Scotland?")
-    # questions.append("Which is the largest royal borough of London??")
-    # questions.append("Which city in Scotland has the largest population?")
-    # questions.append("Is the county of Antrim bigger than the county of Armagh?")
-    # questions.append("Is there a mountain in the county of Greater Manchester taller than 1300 meters above sea level?")
-    # questions.append("Are there more than 10 districts in Hampshire, England?")
-    # questions.append("Which rivers in Scotland have more than 100 km length?")
-    # questions.append("Is there a river in Ireland that crosses more than 3 cities?")
-    # questions.append("Which mountains in Scotland have height more than 1000 meters?")
-    # questions.append("Which cafes in London are at most 3 km from St. Anthony the Great and St. John the Baptist church")
+    questions.extend(["How many underground lines does London have?",
+		"How many counties does England have?",
+		"Which counties border county Lincolnshire?",
+		"Which bridges cross River Thames?",
+		"Through which cities does River Thames flow?",
+		"Is there river that crosses Manchester?",
+		"Which rivers cross Derry?",
+		"Which counties of Scotland border England?",
+		"Which Scottish counties border England?",
+		"Does the county of Durham border Essex?",
+		"Are the cities that River Thames crosses more than 10?",
+		"Are there rivers that cross both England and Wales?",
+		"Is there county of England that borders the Isle of Wight?"])
+
+
 
     return questions
 
@@ -243,6 +215,13 @@ def refine_questions(question, toponyms, types):
             if t+"'s "+t2 in question:
                 question = question.replace(t+"'s "+t2, 'the ' + t2+' of '+t)
 
+    for key, pattern in SUPERLATIVE_SP_REGEX.items():
+        reg_search = re.search(pattern, question)
+        if reg_search is not None:
+            current = question[reg_search.regs[0][0]: reg_search.regs[0][1]]
+            refined = reg_search.group(1)+' '+key
+            question = question.replace(current, refined)
+
     return question
 
 
@@ -261,6 +240,9 @@ COMPARISON = {'more than': '>', 'less than': '<', 'greater than': '>', 'smaller 
 COMPARISON_REGEX = {'more .* than': 'more than', 'less .* than':'less than', 'greater .* than': 'greater than',
                     'smaller .* than': 'smaller than'}
 
+SUPERLATIVE_SP_REGEX = {'nearest to': 'nearest (.*) to', 'closest to':'closest (.*) to',
+                        'farthest to': 'farthest (.*) to'}
+
 fpt = 'data/place_type/type-set.txt'
 factv = 'data/verb/action_verb.txt'
 fstav = 'data/verb/stative_verb.txt'
@@ -276,8 +258,8 @@ countries = load_word(fcountries)
 Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
-questions = load_dataset('data/datasets/GeoQuestion201.csv')
-# questions = load_dummy_dataset()  # if you want to just test! check the function...
+# questions = load_dataset('data/datasets/GeoQuestion201.csv')
+questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 
 def append_to_file(string):
