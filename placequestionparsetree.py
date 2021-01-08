@@ -1030,11 +1030,11 @@ class FOLGenerator:
             if situation.name in ['is', 'are', 'located', 'do', 'dose']:
                 continue
             elif situation.name in ['have', 'has']:
-                nsubjects = search.findall(situation, filter_=lambda node: node.nodeType == 'nsubject')
+                nsubjects = search.findall(situation, filter_=lambda node: node.nodeType == 'nsubj')
                 if len(nsubjects) == 2:
                     # implicit spatial relationships
                     if nsubjects[0].role in ['P', 'p'] and nsubjects[1].role in ['P', 'p']:
-                        if nsubjects[0].role == 'p':
+                        if nsubjects[0].role == 'p' or nsubjects[1].role == 'P':
                             first = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
                             second = PlaceDependencyTree.clone_node_without_children(nsubjects[1])
                         elif nsubjects[1].role == 'p':
@@ -1051,20 +1051,23 @@ class FOLGenerator:
                 relation = AnyNode(name=situation.name, spans=[{}], attributes=None, link='prep', role='R',
                                                nodeType='dep')
                 generic_places = search.findall(self.dep.root, filter_= lambda node: node.role == 'p')
+                specific_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'P')
                 if len(generic_places) == 2:
                     first = PlaceDependencyTree.clone_node_without_children(generic_places[0])
                     second = PlaceDependencyTree.clone_node_without_children(generic_places[1])
                 elif len(generic_places) == 1:
                     first = PlaceDependencyTree.clone_node_without_children(generic_places[0])
-                    specific_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'P')
                     if len(specific_places) == 1:
                         second = PlaceDependencyTree.clone_node_without_children(specific_places[0])
                     elif len(specific_places) > 1:
                         for place in specific_places:
                             if place.name + ' '+ first.name not in self.dep_places and \
                                     first.name + ' ' + place.name not in self.dep_places:
-                                second = PlaceDependencyTree.clone_node_without_children(specific_places[0])
+                                second = PlaceDependencyTree.clone_node_without_children(place)
                                 break
+                elif len(generic_places) == 0 and len(specific_places) == 2:
+                    first = PlaceDependencyTree.clone_node_without_children(specific_places[0])
+                    second = PlaceDependencyTree.clone_node_without_children(specific_places[1])
 
             if first is not None and second is not None and relation is not None:
                 self.dependencies['criteria'].append(Dependency(first, relation, second))
