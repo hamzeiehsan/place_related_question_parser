@@ -8,13 +8,13 @@ class SPARQLTemplates:
                'PREFIX owl:<http://www.w3.org/2002/07/owl#>\n\n'
 
     DEFINE_CONCEPT = '\t?<PI> a db:<CONCEPT> .\n' \
-                    '\t?<PI> db:name ?<PI>NAME; \n' \
-                    '\t\tgeosparql:hasGeometry ?<PI>GEOM. \n' \
-                    '\tFILTER(regex(?<PI>NAME, \"<PIVALUE>\", \"i\" )) .\n'
+                     '\t?<PI> db:name ?<PI>NAME; \n' \
+                     '\t\tgeosparql:hasGeometry ?<PI>GEOM. \n' \
+                     '\tFILTER(regex(?<PI>NAME, \"<PIVALUE>\", \"i\" )) .\n'
 
-    GENERAL_FORMAT_ASK = PREFIXES+'ASK {\n' \
-                         '<WHERE>\n}\n' \
-                                  '<GROUP>\n'
+    GENERAL_FORMAT_ASK = PREFIXES + 'ASK {\n' \
+                                    '<WHERE>\n}\n' \
+                                    '<GROUP>\n'
 
     GENERAL_FORMAT_SIMPLE_FUNCTION = PREFIXES + "SELECT <FUNCTION> \n" \
                                                 "WHERE { \n" \
@@ -86,12 +86,12 @@ class SPARQLTemplates:
 
 class SPARQLGenerator:
     COMPLEX_RELATIONSHIPS = ['within \d.* ',
-                                    'at most \d.* ',
-                                    'less than \d.* away ',
-                                    'more than \d.* away ',
-                                    'in \d.* radius ',
-                                    'in a range of \d.* ',
-                                    'in the range of \d.* ']
+                             'at most \d.* ',
+                             'less than \d.* away ',
+                             'more than \d.* away ',
+                             'in \d.* radius ',
+                             'in a range of \d.* ',
+                             'in the range of \d.* ']
 
     def __init__(self, dependencies, variables):
         self.dependencies = dependencies
@@ -138,7 +138,7 @@ class SPARQLGenerator:
         template = template.replace('<GROUP>', self.group_by)
         if is_ask and self.group_by != '':
             template = template.replace('ASK {', 'ASK {\nSELECT * \nWHERE {')
-            template = template+'}\n'
+            template = template + '}\n'
 
         return template
 
@@ -151,7 +151,7 @@ class SPARQLGenerator:
                 if declaration.arg1.role in ['p', 'e']:
                     declare_statments += SPARQLGenerator.define_variable(declaration)
             else:
-                self.concept_varids[declaration.arg1.name] = 'c'+str(varid)
+                self.concept_varids[declaration.arg1.name] = 'c' + str(varid)
                 varid += 1
                 declare_statments += SPARQLGenerator.define_concept(declaration,
                                                                     self.concept_varids[declaration.arg1.name])
@@ -179,7 +179,7 @@ class SPARQLGenerator:
         topic = resolver.get_type()
         sort = ''
         if superlative.arg1.role in ['P', 'p']:
-            sort = 'ORDER BY '+resolver.asc_or_desc().upper()+'('+var_id+topic+')'
+            sort = 'ORDER BY ' + resolver.asc_or_desc().upper() + '(' + var_id + topic + ')'
         else:
             sort = 'ORDER BY ' + resolver.asc_or_desc().upper() + '(' + var_id + ')'
         return sort
@@ -194,12 +194,12 @@ class SPARQLGenerator:
     def define_attribute(self, dependency, simple=True):
         template = SPARQLTemplates.ATTRIBUTE_RELATION
         if simple:
-            template = template.replace('<PI>', self.find_var(dependency.arg2.name))\
-                .replace('<OBJECT>', self.find_var(dependency.arg1.name))\
+            template = template.replace('<PI>', self.find_var(dependency.arg2.name)) \
+                .replace('<OBJECT>', self.find_var(dependency.arg1.name)) \
                 .replace('<ATTRIBUTE>', dependency.arg1.name.replace(' ', '_'))
         else:
-            template = template.replace('<PI>', self.find_var(dependency.arg1.name))\
-                .replace('<OBJECT>', self.find_var(dependency.arg2.name))\
+            template = template.replace('<PI>', self.find_var(dependency.arg1.name)) \
+                .replace('<OBJECT>', self.find_var(dependency.arg2.name)) \
                 .replace('<ATTRIBUTE>', dependency.arg2.name.replace(' ', '_'))
         return template
 
@@ -246,7 +246,7 @@ class SPARQLGenerator:
                 if criterion.relation.link == 'SUPERLATIVE' and criterion.arg1.role in ['p', 'P']:
                     resolver = AdjectiveResolver(criterion.arg2.name)
                     topic = resolver.get_type()
-                    where_clause += SPARQLTemplates.TOPIC_DEFINITION.replace('<TOPIC>', topic)\
+                    where_clause += SPARQLTemplates.TOPIC_DEFINITION.replace('<TOPIC>', topic) \
                         .replace('<PI>', self.variables[criterion.arg1.name])
                 else:
                     if criterion.arg1.role == 'p':
@@ -257,8 +257,8 @@ class SPARQLGenerator:
             elif criterion.relation.link == 'PROPERTY':
                 where_clause += self.define_attribute(criterion)
             elif criterion.relation.link == 'NOT':
-                where_clause += SPARQLTemplates.DEFINE_TYPE_EXCEPT.replace('<PI>', self.variables[criterion.arg1.name])\
-                        .replace('<EX>', self.find_var(criterion.arg2.name))
+                where_clause += SPARQLTemplates.DEFINE_TYPE_EXCEPT.replace('<PI>', self.variables[criterion.arg1.name]) \
+                    .replace('<EX>', self.find_var(criterion.arg2.name))
             elif criterion.relation.role == 'R':  # spatial relationships
                 if len(criterion.extra) == 0:
                     where_clause += self.define_spatial_relationship(criterion)
@@ -277,11 +277,11 @@ class SPARQLGenerator:
             else:
                 var_id = intent.arg2.name
             if intent.arg1.role == '6':  # how many
-                pis += '(COUNT(distinct ?'+var_id+') as ?count'+var_id+')'
+                pis += '(COUNT(distinct ?' + var_id + ') as ?count' + var_id + ')'
             elif intent.arg1.role == '1':  # where
-                pis += '?'+var_id+'GEOM '
+                pis += '?' + var_id + 'GEOM '
             else:
-                pis += '?'+var_id+' '
+                pis += '?' + var_id + ' '
         return pis
 
     def define_comparison(self, dependency):
@@ -297,7 +297,7 @@ class SPARQLGenerator:
                 topic = resolver.get_type()
                 template = SPARQLTemplates.ATTRIBUTE_RELATION
                 template = template.replace('<PI>', self.find_var(dependency.arg1.name)) \
-                    .replace('<OBJECT>', self.find_var(dependency.arg1.name)+topic) \
+                    .replace('<OBJECT>', self.find_var(dependency.arg1.name) + topic) \
                     .replace('<ATTRIBUTE>', topic.replace(' ', '_').upper())
                 comparison += template
                 template = SPARQLTemplates.ATTRIBUTE_RELATION
@@ -306,8 +306,8 @@ class SPARQLGenerator:
                     .replace('<ATTRIBUTE>', topic.replace(' ', '_').upper())
                 comparison += template
                 template = SPARQLTemplates.ATTRIBUTE_COMPARISON.replace(
-                    '<ATTRIBUTE1>', self.find_var(dependency.arg1.name)+topic).replace(
-                    '<ATTRIBUTE2>', self.find_var(dependency.arg2.name)+topic).replace(
+                    '<ATTRIBUTE1>', self.find_var(dependency.arg1.name) + topic).replace(
+                    '<ATTRIBUTE2>', self.find_var(dependency.arg2.name) + topic).replace(
                     '<SIGN>', sign)
                 comparison += template
                 return comparison
@@ -323,7 +323,7 @@ class SPARQLGenerator:
                 elif dependency.arg1.role == 'p':
                     criteria = self.dependencies['criteria']
                     for c in criteria:
-                        if c.arg1.name == dependency.arg1.name and c.arg2.role in ['p','P']:
+                        if c.arg1.name == dependency.arg1.name and c.arg2.role in ['p', 'P']:
                             self.group_by = SPARQLTemplates.GROUP_BY_HAVING.replace('<PI1>',
                                                                                     self.find_var(c.arg2.name))
                             self.group_by = self.group_by.replace('<PI2>', self.find_var(dependency.arg1.name))
@@ -332,7 +332,7 @@ class SPARQLGenerator:
                         elif c.relation.link == 'prep' and c.relation.role == 'R':
                             if c.arg2.name == dependency.arg1.name:
                                 self.group_by = SPARQLTemplates.GROUP_BY_HAVING.replace('<PI1>',
-                                                                                    self.find_var(c.arg1.name))
+                                                                                        self.find_var(c.arg1.name))
                                 self.group_by = self.group_by.replace('<PI2>', self.find_var(dependency.arg1.name))
                                 self.group_by = self.group_by.replace('<COUNT>', dependency.arg2.name.split()[0])
                                 break
@@ -366,24 +366,24 @@ class AdjectiveResolver:
         self.superlative = superlative
 
     def get_type(self):
-        if 'elevated' in self.adjective or 'highest' in self.adjective or 'lowest' in self.adjective or\
+        if 'elevated' in self.adjective or 'highest' in self.adjective or 'lowest' in self.adjective or \
                 'higher' in self.adjective or 'lower' in self.adjective:
             return AdjectiveResolver.TYPE[0]
-        elif 'closest' in self.adjective or 'nearest' in self.adjective or 'farthest' in self.adjective or\
+        elif 'closest' in self.adjective or 'nearest' in self.adjective or 'farthest' in self.adjective or \
                 'closer' in self.adjective or 'nearer' in self.adjective or 'farther' in self.adjective:
             return AdjectiveResolver.TYPE[1]
         elif 'longest' in self.adjective or 'longer' in self.adjective:
             return AdjectiveResolver.TYPE[2]
-        elif 'largest' in self.adjective or 'biggest' in self.adjective or 'smallest' in self.adjective or\
+        elif 'largest' in self.adjective or 'biggest' in self.adjective or 'smallest' in self.adjective or \
                 'larger' in self.adjective or 'smaller' in self.adjective or 'bigger' in self.adjective:
             return AdjectiveResolver.TYPE[3]
-        elif 'oldest' in self.adjective or 'newest' in self.adjective or\
+        elif 'oldest' in self.adjective or 'newest' in self.adjective or \
                 'older' in self.adjective or 'newer' in self.adjective:
             return AdjectiveResolver.TYPE[4]
         return AdjectiveResolver.TYPE[5]
 
     def asc_or_desc(self):
-        if 'close' in self.adjective or 'near' in self.adjective or 'small' in self.adjective or\
+        if 'close' in self.adjective or 'near' in self.adjective or 'small' in self.adjective or \
                 'new' in self.adjective or 'low' in self.adjective:
             return 'asc'
         return 'desc'

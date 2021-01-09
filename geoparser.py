@@ -50,11 +50,11 @@ def load_dataset(path):
 
 def load_dummy_dataset():
     questions = []
-    questions.extend([#"Are the cities that River Thames crosses more than 10?",
+    questions.extend(["Are the cities that River Thames crosses more than 10?",
                       "Which mountains in Scotland have height more than 1000 meters?",
                       "Which villages in Scotland have a population of less than 500 people?",
-                      # "Which city is southeast of Salford?",
-                      # "In which city is Big Ben located?",
+                      "Which city is southeast of Salford?",
+                      "In which city is Big Ben located?",
                       "Which rivers in Scotland have more than 100 km length?",
                       "Which provinces of Ireland have population over 2000000?",
                       "Which cities in England have at least 2 castles?"])
@@ -251,6 +251,8 @@ Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
 questions = load_dataset('data/datasets/GeoQuestion201.csv')
+
+
 # questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 

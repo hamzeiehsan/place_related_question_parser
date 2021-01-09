@@ -1080,7 +1080,7 @@ class FOLGenerator:
                             relation = PlaceDependencyTree.clone_node_without_children(situation)
                     else:
                         generics = search.findall(
-                            situation, filter_= lambda node: node.parent == situation and node.role == 'p')
+                            situation, filter_=lambda node: node.parent == situation and node.role == 'p')
                         objects = search.findall(
                             situation, filter_=lambda node: node.role == 'o')
                         if len(generics) == 1 and len(objects) == 1:
