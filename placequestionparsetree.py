@@ -421,7 +421,7 @@ class PlaceQuestionParseTree:
 
             siblings = search.findall(node.parent, filter_=lambda node: node.role not in ('&', '|', '!', 'q') and
                                                                         node.nodeType != 'DT' and (
-                                                                                    node.role != '' or node.nodeType == ','))
+                                                                                node.role != '' or node.nodeType == ','))
             sibling_roles = set()
             for sibling in siblings:
                 if sibling.nodeType == ',':
@@ -462,7 +462,7 @@ class PlaceQuestionParseTree:
                     if child == num.parent:
                         found = True
                     elif found and child.name in PlaceDependencyTree.UNITS:
-                        new_node = AnyNode(child.parent, role='MESAURE', name=num.name + ' ' + child.name,
+                        new_node = AnyNode(child.parent, role='MEASURE', name=num.name + ' ' + child.name,
                                            nodeType='NP', spans={
                                 'start': self.root.name.index(num.name + ' ' + child.name),
                                 'end': self.root.name.index(num.name + ' ' + child.name) +
@@ -730,10 +730,12 @@ class FOLGenerator:
         self.dependencies['criteria'] = []
         self.extract_conjunctions()
         self.extract_property_relationships()
-        self.extract_spatiotemporal_relationships()
         self.extract_quality_relations()
-        self.extract_comparisons()
+
+        self.extract_spatiotemporal_relationships()
         self.extract_situations()
+
+        self.extract_comparisons()
         return self.dependencies
 
     def declare(self):
@@ -752,7 +754,7 @@ class FOLGenerator:
             first = PlaceDependencyTree.clone_node_without_children(generic)
             relation = AnyNode(name='DECLARE', spans=[{}], attributes=None, link='IS', nodeType='RELATION')
             second = AnyNode(name='x' + str(var_id), spans=[{}], attributes=None,
-                             link=generic.name, nodeType='VARIABLE')
+                             link=PlaceDependencyTree.preprocess_names(generic.name), nodeType='VARIABLE')
             self.dependencies['declaration'].append(Dependency(first, relation, second))
             self.variables[first.name] = 'x' + str(var_id)
             var_id += 1
@@ -892,7 +894,7 @@ class FOLGenerator:
             logical_form += ') '
 
         elif criterion.relation.link == 'SUPERLATIVE':
-            if criterion.arg1.name in self.variables.keys():
+            if criterion.arg1.name in self.variables.keys() and criterion.arg1.role == 'p':
                 logical_form = logical_form.replace(criterion.arg1.name, criterion.arg2.name.replace(' ', '_').upper() +
                                                     '(' + criterion.arg1.name + ')', 1)
                 if last:
@@ -1047,10 +1049,48 @@ class FOLGenerator:
                     elif (nsubjects[0].role in ['P', 'p'] and nsubjects[1].role in ['o']) or \
                             (nsubjects[1].role in ['P', 'p'] and nsubjects[0].role in ['o']):
                         relation = PlaceDependencyTree.clone_node_without_children(situation)
+                elif len(nsubjects) == 1:
+                    dobjs = search.findall(situation, filter_=lambda node: node.parent == situation and
+                                                                           node.nodeType == 'dobj' and
+                                                                           node.role in ['o', 'p'])
+                    if len(dobjs) == 1:
+                        if dobjs[0].role == 'o':
+                            first = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
+                            second = PlaceDependencyTree.clone_node_without_children(dobjs[0])
+                            relation = PlaceDependencyTree.clone_node_without_children(situation)
+                        else:
+                            first = PlaceDependencyTree.clone_node_without_children(dobjs[0])
+                            second = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
+                            relation = AnyNode(name='in', spans=[{}], attributes=None, link='prep', role='R',
+                                               nodeType='dep')
+                    elif len(dobjs) == 0 and situation.parent is not None and situation.parent.role == 'o':
+                        first = PlaceDependencyTree.clone_node_without_children(nsubjects[0])
+                        second = PlaceDependencyTree.clone_node_without_children(situation.parent)
+                        relation = PlaceDependencyTree.clone_node_without_children(situation)
+
+                elif len(nsubjects) == 0:
+                    if situation.parent is not None and situation.parent.role == 'o':
+                        second = PlaceDependencyTree.clone_node_without_children(situation.parent)
+                    elif len(situation.children) == 1 and situation.children[0].role == 'o':
+                        second = PlaceDependencyTree.clone_node_without_children(situation.children[0])
+                    if second is not None:
+                        generics = search.findall(situation.parent, filter_=lambda node: node.role == 'p')
+                        if len(generics) == 1:
+                            first = PlaceDependencyTree.clone_node_without_children(generics[0])
+                            relation = PlaceDependencyTree.clone_node_without_children(situation)
+                    else:
+                        generics = search.findall(
+                            situation, filter_= lambda node: node.parent == situation and node.role == 'p')
+                        objects = search.findall(
+                            situation, filter_=lambda node: node.role == 'o')
+                        if len(generics) == 1 and len(objects) == 1:
+                            first = PlaceDependencyTree.clone_node_without_children(generics[0])
+                            second = PlaceDependencyTree.clone_node_without_children(objects[0])
+                            relation = PlaceDependencyTree.clone_node_without_children(situation)
             elif situation.name in ['border', 'borders', 'cross', 'crosses', 'flow', 'flows']:
                 relation = AnyNode(name=situation.name, spans=[{}], attributes=None, link='prep', role='R',
-                                               nodeType='dep')
-                generic_places = search.findall(self.dep.root, filter_= lambda node: node.role == 'p')
+                                   nodeType='dep')
+                generic_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'p')
                 specific_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'P')
                 if len(generic_places) == 2:
                     first = PlaceDependencyTree.clone_node_without_children(generic_places[0])
@@ -1061,7 +1101,7 @@ class FOLGenerator:
                         second = PlaceDependencyTree.clone_node_without_children(specific_places[0])
                     elif len(specific_places) > 1:
                         for place in specific_places:
-                            if place.name + ' '+ first.name not in self.dep_places and \
+                            if place.name + ' ' + first.name not in self.dep_places and \
                                     first.name + ' ' + place.name not in self.dep_places:
                                 second = PlaceDependencyTree.clone_node_without_children(place)
                                 break
@@ -1389,7 +1429,7 @@ class PlaceDependencyTree:
             else:
                 nodes = search.findall(conj, filter_=lambda node: node.link in ['dep', 'pobj'] and
                                                                   (
-                                                                              'PROPN' in node.attributes or 'NOUN' in node.attributes))
+                                                                          'PROPN' in node.attributes or 'NOUN' in node.attributes))
                 for node in nodes:
                     if first is not None:
                         second = PlaceDependencyTree.clone_node_without_children(node)
@@ -1547,13 +1587,26 @@ class PlaceDependencyTree:
     def clone_node_without_children(node, override={}, cons_tree=False):
         if len(override) == 0:
             if cons_tree:
-                return AnyNode(name=node.name, spans=node.spans, attributes=[node.nodeType],
+                return AnyNode(name=PlaceDependencyTree.preprocess_names(node.name), spans=node.spans,
+                               attributes=[node.nodeType],
                                link='', nodeType=node.nodeType, role=node.role)
-            return AnyNode(name=node.name, spans=node.spans, attributes=node.attributes,
+            return AnyNode(name=PlaceDependencyTree.preprocess_names(node.name), spans=node.spans,
+                           attributes=node.attributes,
                            link=node.link, nodeType=node.nodeType, role=node.role)
         else:
-            return AnyNode(name=node.name, spans=node.spans, attributes=override['attributes'],
+            return AnyNode(name=PlaceDependencyTree.preprocess_names(node.name), spans=node.spans,
+                           attributes=override['attributes'],
                            link=override['link'], nodeType=override['nodeType'], role=node.role)
+
+    @staticmethod
+    def preprocess_names(string):
+        if string.startswith('a '):
+            return string.replace('a ', '')
+        elif string.startswith('an '):
+            return string.replace('an ', '')
+        elif string.startswith('the '):
+            return string.replace('the ', '')
+        return string
 
     def print_dependencies(self):
         for dep in self.dependencies:

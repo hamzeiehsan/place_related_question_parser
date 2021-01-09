@@ -5,14 +5,12 @@ import re
 
 import logging
 
-
 logging.basicConfig(level=logging.INFO)
 
 COMPOUNDS_QW = ['How many', 'Are there', 'Is there', 'how many', 'are there', 'is there', 'In which', 'In what',
                 'Through which', 'Through what']
-COMPOUNDS_QW_ROLE = {'How many':'6', 'Are there':'8', 'Is there':'8', 'In which': '3', 'In what': '2',
+COMPOUNDS_QW_ROLE = {'How many': '6', 'Are there': '8', 'Is there': '8', 'In which': '3', 'In what': '2',
                      'Through which': '3', 'Through what': '2'}
-
 
 
 # load place type
@@ -22,9 +20,9 @@ def load_pt(fpt):
     fpt = open(fpt, 'r', encoding="utf8")
     for line in fpt.readlines():
         pt_set.add(line.strip())
-        pt_set.add('the '+line.strip())
+        pt_set.add('the ' + line.strip())
         pt_dict[line.strip()] = 1
-        pt_dict['the '+line.strip()] = 1
+        pt_dict['the ' + line.strip()] = 1
     fpt.close()
     return pt_set, pt_dict
 
@@ -52,21 +50,14 @@ def load_dataset(path):
 
 def load_dummy_dataset():
     questions = []
-    questions.extend(["How many underground lines does London have?",
-		"How many counties does England have?",
-		"Which counties border county Lincolnshire?",
-		"Which bridges cross River Thames?",
-		"Through which cities does River Thames flow?",
-		"Is there river that crosses Manchester?",
-		"Which rivers cross Derry?",
-		"Which counties of Scotland border England?",
-		"Which Scottish counties border England?",
-		"Does the county of Durham border Essex?",
-		"Are the cities that River Thames crosses more than 10?",
-		"Are there rivers that cross both England and Wales?",
-		"Is there county of England that borders the Isle of Wight?"])
-
-
+    questions.extend([#"Are the cities that River Thames crosses more than 10?",
+                      "Which mountains in Scotland have height more than 1000 meters?",
+                      "Which villages in Scotland have a population of less than 500 people?",
+                      # "Which city is southeast of Salford?",
+                      # "In which city is Big Ben located?",
+                      "Which rivers in Scotland have more than 100 km length?",
+                      "Which provinces of Ireland have population over 2000000?",
+                      "Which cities in England have at least 2 castles?"])
 
     return questions
 
@@ -92,12 +83,13 @@ def find_types(question, excluded, types, specifics=[]):
         if type in question:
             captured.append(type)
             for specific in specifics:
-                if type+' '+specific in whole_question:
-                    captured.append(type+' '+specific)
-                elif specific+' '+type in whole_question:
-                    captured.append(specific+' '+type)
-                elif not type.endswith("s") and 'the '+type+' of '+ specific in whole_question: # not plural and have the pattern the type of P
-                    captured.append('the '+type+' of '+ specific)
+                if type + ' ' + specific in whole_question:
+                    captured.append(type + ' ' + specific)
+                elif specific + ' ' + type in whole_question:
+                    captured.append(specific + ' ' + type)
+                elif not type.endswith(
+                        "s") and 'the ' + type + ' of ' + specific in whole_question:  # not plural and have the pattern the type of P
+                    captured.append('the ' + type + ' of ' + specific)
     captured = sorted(captured, key=len, reverse=True)
     return captured
 
@@ -112,13 +104,13 @@ def find_compound_question_words(question):
     for comp in COMPOUNDS_QW:
         if comp in question:
             if comp in COMPOUNDS_QW_ROLE.keys():
-                res[comp+'--'+str(question.index(comp))] = {'start':question.index(comp),
-                                                            'end':question.index(comp)+len(comp),
-                                                            'role':COMPOUNDS_QW_ROLE[comp], 'pos': 'ADV'}
+                res[comp + '--' + str(question.index(comp))] = {'start': question.index(comp),
+                                                                'end': question.index(comp) + len(comp),
+                                                                'role': COMPOUNDS_QW_ROLE[comp], 'pos': 'ADV'}
             else:
-                res[comp+'--'+str(question.index(comp))] = {'start': question.index(comp),
-                                                            'end': question.index(comp) + len(comp),
-                                                            'role': '', 'pos': 'ADV'}
+                res[comp + '--' + str(question.index(comp))] = {'start': question.index(comp),
+                                                                'end': question.index(comp) + len(comp),
+                                                                'role': '', 'pos': 'ADV'}
     return res
 
 
@@ -176,10 +168,10 @@ def construct_cleaning_labels(results, question):
             matches_positions = [[match.start(), match.end()] for match in matches]
             for position in matches_positions:
                 if not is_overlap(position, indices):
-                    labelled[v+'--'+str(position[0])] = {'start': position[0],
-                                      'end': position[1],
-                                      'role': role,
-                                      'pos': 'NOUN'}
+                    labelled[v + '--' + str(position[0])] = {'start': position[0],
+                                                             'end': position[1],
+                                                             'role': role,
+                                                             'pos': 'NOUN'}
             indices.extend(matches_positions)
     return labelled
 
@@ -193,9 +185,9 @@ def is_overlap(position, indices):
 
 def clean_extracted_info(info):
     clean_info = {}
-    for k1,v1 in info.items():
+    for k1, v1 in info.items():
         correct = True
-        for k2,v2 in info.items():
+        for k2, v2 in info.items():
             if k1 != k2:
                 if re.split('--', k1.strip())[0] in k2 and v1['start'] >= v2['start'] and v1['end'] <= v2['end']:
                     correct = False
@@ -209,17 +201,17 @@ def clean_extracted_info(info):
 def refine_questions(question, toponyms, types):
     for t in toponyms:
         for t2 in toponyms:
-            if t+', '+t2 in question:
-                question = question.replace(t+', '+t2, t+' in '+t2)
+            if t + ', ' + t2 in question:
+                question = question.replace(t + ', ' + t2, t + ' in ' + t2)
         for t2 in types:
-            if t+"'s "+t2 in question:
-                question = question.replace(t+"'s "+t2, 'the ' + t2+' of '+t)
+            if t + "'s " + t2 in question:
+                question = question.replace(t + "'s " + t2, 'the ' + t2 + ' of ' + t)
 
     for key, pattern in SUPERLATIVE_SP_REGEX.items():
         reg_search = re.search(pattern, question)
         if reg_search is not None:
             current = question[reg_search.regs[0][0]: reg_search.regs[0][1]]
-            refined = reg_search.group(1)+' '+key
+            refined = reg_search.group(1) + ' ' + key
             question = question.replace(current, refined)
 
     return question
@@ -237,10 +229,10 @@ ENCODINGS = dict(
 COMPARISON = {'more than': '>', 'less than': '<', 'greater than': '>', 'smaller than': '<', 'equal to': '=',
               'at most': '<=', 'at least': '>=', 'over': '>'}
 
-COMPARISON_REGEX = {'more .* than': 'more than', 'less .* than':'less than', 'greater .* than': 'greater than',
+COMPARISON_REGEX = {'more .* than': 'more than', 'less .* than': 'less than', 'greater .* than': 'greater than',
                     'smaller .* than': 'smaller than'}
 
-SUPERLATIVE_SP_REGEX = {'nearest to': 'nearest (.*) to', 'closest to':'closest (.*) to',
+SUPERLATIVE_SP_REGEX = {'nearest to': 'nearest (.*) to', 'closest to': 'closest (.*) to',
                         'farthest to': 'farthest (.*) to'}
 
 fpt = 'data/place_type/type-set.txt'
@@ -278,7 +270,7 @@ def analyze(questions):
         console = '*********************************************\n'
         # extract NER using fine-grained NER model
         result = extract_information(question, pt_set, et_set)
-        logging.info('NER extracts: \n'+str(result))
+        logging.info('NER extracts: \n' + str(result))
         question = refine_questions(question, result['toponyms'], result['place_types'])
 
         # construct and constituency tree dependency tree
@@ -289,8 +281,9 @@ def analyze(questions):
         for k, v in PRONOUN.items():
             if question.startswith(k + ' '):
                 tree.label_role(k, v, question_words=True)
-                labelled[k+"--"+str(question.index(k))] = {'start': question.index(k),
-                                                           'end': question.index(k)+len(k), 'role': v, 'pos': 'ADV'}
+                labelled[k + "--" + str(question.index(k))] = {'start': question.index(k),
+                                                               'end': question.index(k) + len(k), 'role': v,
+                                                               'pos': 'ADV'}
         compound_qw = find_compound_question_words(question)
         for qw in compound_qw.keys():
             role = ''
@@ -300,10 +293,10 @@ def analyze(questions):
         labelled = {**labelled, **compound_qw}
 
         ners = construct_cleaning_labels(result, question)
-        logging.info('clean ners:\n'+str(ners))
-        console+=str(ners)+'\n'
+        logging.info('clean ners:\n' + str(ners))
+        console += str(ners) + '\n'
 
-        for k,v in ners.items():
+        for k, v in ners.items():
             tree.label_role(re.split('--', k.strip())[0], v['role'], clean=True)
 
         labelled = {**labelled, **ners}
@@ -322,16 +315,16 @@ def analyze(questions):
         for c, v in COMPARISON.items():
             if c in question:
                 tree.label_role(c, v, comparison=True)
-                labelled[c+'--'+str(question.index(c))] = {'start': question.index(c),
-                                                           'end': question.index(c) + len(c),
-                                                            'role': v, 'pos': 'ADJ'}
+                labelled[c + '--' + str(question.index(c))] = {'start': question.index(c),
+                                                               'end': question.index(c) + len(c),
+                                                               'role': v, 'pos': 'ADJ'}
         for creg, c in COMPARISON_REGEX.items():
             reg_search = re.search(creg, question)
             if reg_search is not None:
                 tree.label_complex_comparison(reg_search, c, COMPARISON[c])
-                labelled[c+'--'+str(reg_search.regs[0][0])] = {'start': reg_search.regs[0][0],
-                                                               'end': reg_search.regs[0][1], 'role': COMPARISON[c],
-                                                               'pos': 'ADJ'}
+                labelled[c + '--' + str(reg_search.regs[0][0])] = {'start': reg_search.regs[0][0],
+                                                                   'end': reg_search.regs[0][1], 'role': COMPARISON[c],
+                                                                   'pos': 'ADJ'}
 
         tree.label_events_actions()
         tree.clean_phrases()
@@ -345,7 +338,7 @@ def analyze(questions):
         logging.debug('initial dependency tree:\n' + str(d_tree))
 
         d_tree.clean_d_tree(labelled)
-        logging.info('refined dependency tree:\n'+str(d_tree))
+        logging.info('refined dependency tree:\n' + str(d_tree))
         console += str(d_tree) + '\n'
 
         # use FOLGenerator to detect dependencies inside both parsing trees
@@ -358,15 +351,13 @@ def analyze(questions):
         console += dep_strings + '\n'
 
         # print FOL statements
-        # todo define variables (p, e, o); implicit (where - situations/activities);
-        #  define properties and constants; define relationships, comparison
-        log_string =fol.print_logical_form()
+        log_string = fol.print_logical_form()
         console += log_string + '\n'
 
         # generate GeoSPARQL queries from FOL statements (deps)
         generator = SPARQLGenerator(fol.dependencies, fol.variables)
         print(generator.to_SPARQL())
-        console += generator.to_SPARQL()+'\n\n\n'
+        console += generator.to_SPARQL() + '\n\n\n'
         append_to_file(console)
 
 

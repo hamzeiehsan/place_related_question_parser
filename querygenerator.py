@@ -13,39 +13,45 @@ class SPARQLTemplates:
                     '\tFILTER(regex(?<PI>NAME, \"<PIVALUE>\", \"i\" )) .\n'
 
     GENERAL_FORMAT_ASK = PREFIXES+'ASK {\n' \
-                         '<WHERE>\n}'
+                         '<WHERE>\n}\n' \
+                                  '<GROUP>\n'
 
     GENERAL_FORMAT_SIMPLE_FUNCTION = PREFIXES + "SELECT <FUNCTION> \n" \
                                                 "WHERE { \n" \
-                                                "<WHERE>}\n"
+                                                "<WHERE>}\n" \
+                                                "<GROUP>\n"
 
     GENERAL_FORMAT_SORT_FUNCTION = PREFIXES + "SELECT <PILIST> \n" \
                                               "WHERE { \n" \
                                               "<WHERE>}\n" \
+                                              "<GROUP>\n" \
                                               "<SORT>\n LIMIT <LIMIT>"
 
     TOPIC_DEFINITION = '\t?<PI> db:<TOPIC> ?<PI><TOPIC>. \n'
 
     GENERAL_FORMAT = PREFIXES + "SELECT <PILIST> \n" \
                                 "WHERE { \n<WHERE>" \
-                                "}\n"
+                                "}\n" \
+                                '<GROUP>\n'
 
     DEFINE_TYPE = '\t?<PI> db:type ?<PI>TYPE;\n' \
                   '\t\tgeosparql:hasGeometry ?<PI>GEOM;\n' \
                   '\t\tdb:name ?<PI>NAME.\n' \
                   '\tFILTER(regex(?<PI>TYPE, \"<PTVALUE>\", \"i\" )) .\n'
 
-    DEFINE_TYPE_EXEMPT = '\tFILTER NOT EXISTS { ?<PI> (owl:sameAs|^owl:sameAs) ?<EX>}. \n'
+    DEFINE_TYPE_EXCEPT = '\tFILTER NOT EXISTS { ?<PI> (owl:sameAs|^owl:sameAs) ?<EX>}. \n'
 
     OBJECT_RELATION = '\t?<PI> <OBJ_REL> ?<OBJECT>. \n' \
                       '\t?<OBJECT> db:name ?<OBJECT>NAME;\n' \
                       '\t\tfilter(regex(?<OBJECT>NAME, \"<OBJECT_NAME>\", \"i\" )). \n'
 
-    ATTRIBUTE_COMPARISON = '\t?<ATTRIBUTE1> <SIGN> ?<ATTRIBUTE2> .'
+    ATTRIBUTE_COMPARISON = '\t?<ATTRIBUTE1> <SIGN> ?<ATTRIBUTE2> . \n'
 
     KNOWN_RESOURCES = '\t?<PI> VALUES {<?<PIURI>>}. \n'
 
     ATTRIBUTE_RELATION = '\t?<PI> db:has_<ATTRIBUTE> ?<OBJECT>.\n'
+
+    QUALITY_RELATION = '\t?<PI> a db:<ATTRIBUTE>. \n'
 
     DISTANCE_ATTRIBUTE = '\t?<PI1>distance geof:distance(?<PI1>GEOM ?<PI2>GEOM units:meter).\n'
 
@@ -59,6 +65,14 @@ class SPARQLTemplates:
                                 'south of': '\tFILTER (spatialF:southGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'east of': '\tFILTER (spatialF:eastGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'west of': '\tFILTER (spatialF:westGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
+                                'southeast of': '\tFILTER (spatialF:southGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n'
+                                                '\tFILTER (spatialF:eastGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
+                                'southwest of': '\tFILTER (spatialF:southGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n'
+                                                '\tFILTER (spatialF:westGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
+                                'northeast of': '\tFILTER (spatialF:northGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n'
+                                                '\tFILTER (spatialF:eastGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
+                                'northwest of': '\tFILTER (spatialF:northGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n'
+                                                '\tFILTER (spatialF:westGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'border': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'borders': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'cross': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
@@ -66,6 +80,8 @@ class SPARQLTemplates:
                                 'flow': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'flows': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'OTHER': '\tFILTER(geof:sfIntersects(<PI1>GEOM,<PI2>GEOM)).\n'}
+
+    GROUP_BY_HAVING = 'GROUP BY ?<PI1> \nHAVING (count(DISTINCT ?<PI2>) > <COUNT>)'
 
 
 class SPARQLGenerator:
@@ -80,15 +96,18 @@ class SPARQLGenerator:
     def __init__(self, dependencies, variables):
         self.dependencies = dependencies
         self.variables = variables
-
+        self.group_by = ''
+        self.select_substitute = ''
         self.concept_varids = {}
 
     def to_SPARQL(self):
         template = SPARQLTemplates.GENERAL_FORMAT
         criteria = self.dependencies['criteria']
         intents = self.dependencies['intent']
+        is_ask = False
         if len(intents) == 1 and intents[0].arg1.role == '8':
             template = SPARQLTemplates.GENERAL_FORMAT_ASK
+            is_ask = True
         elif intents[0].arg1.role != '6':
             sort = None
             for criterion in criteria:
@@ -115,6 +134,12 @@ class SPARQLGenerator:
 
         template = template.replace('<WHERE>', where_clause)
         # return the results
+
+        template = template.replace('<GROUP>', self.group_by)
+        if is_ask and self.group_by != '':
+            template = template.replace('ASK {', 'ASK {\nSELECT * \nWHERE {')
+            template = template+'}\n'
+
         return template
 
     def declare(self):
@@ -141,13 +166,23 @@ class SPARQLGenerator:
         return template
 
     def construct_sort(self, superlative):
-        if superlative.relation.role == 'R':
+        role = None
+        try:
+            role = superlative.relation.role
+        except:
+            print('superlative has no role...')
+        if role is not None and role == 'R':
             resolver = AdjectiveResolver(superlative.relation.name)
         else:
             resolver = AdjectiveResolver(superlative.arg2.name)
         var_id = self.variables[superlative.arg1.name]
         topic = resolver.get_type()
-        return 'ORDER BY '+resolver.asc_or_desc().upper()+'('+var_id+topic+')'
+        sort = ''
+        if superlative.arg1.role in ['P', 'p']:
+            sort = 'ORDER BY '+resolver.asc_or_desc().upper()+'('+var_id+topic+')'
+        else:
+            sort = 'ORDER BY ' + resolver.asc_or_desc().upper() + '(' + var_id + ')'
+        return sort
 
     @staticmethod
     def define_variable(dependency):
@@ -156,11 +191,16 @@ class SPARQLGenerator:
         template = template.replace('<PTVALUE>', dependency.arg1.name)
         return template
 
-    def define_attribute(self, dependency):
+    def define_attribute(self, dependency, simple=True):
         template = SPARQLTemplates.ATTRIBUTE_RELATION
-        template = template.replace('<PI>', self.find_var(dependency.arg2.name))\
-            .replace('<OBJECT>', self.find_var(dependency.arg1.name))\
-            .replace('<ATTRIBUTE>', dependency.arg1.name.replace(' ', '_'))
+        if simple:
+            template = template.replace('<PI>', self.find_var(dependency.arg2.name))\
+                .replace('<OBJECT>', self.find_var(dependency.arg1.name))\
+                .replace('<ATTRIBUTE>', dependency.arg1.name.replace(' ', '_'))
+        else:
+            template = template.replace('<PI>', self.find_var(dependency.arg1.name))\
+                .replace('<OBJECT>', self.find_var(dependency.arg2.name))\
+                .replace('<ATTRIBUTE>', dependency.arg2.name.replace(' ', '_'))
         return template
 
     def find_var(self, string):
@@ -193,10 +233,6 @@ class SPARQLGenerator:
             template = template.replace('<DISTANCE>', val).replace('<UNIT>', unit)
         return template
 
-    def define_situations(self, dependency):
-        # todo situation, spatial situation, event situation...
-        return
-
     def construct_where(self):
         where_clause = ''
 
@@ -207,17 +243,22 @@ class SPARQLGenerator:
             if criterion.relation.link == 'AND/OR':
                 continue
             if criterion.relation.name == 'IS/ARE':
-                if criterion.relation.link == 'SUPERLATIVE':
+                if criterion.relation.link == 'SUPERLATIVE' and criterion.arg1.role in ['p', 'P']:
                     resolver = AdjectiveResolver(criterion.arg2.name)
                     topic = resolver.get_type()
                     where_clause += SPARQLTemplates.TOPIC_DEFINITION.replace('<TOPIC>', topic)\
                         .replace('<PI>', self.variables[criterion.arg1.name])
                 else:
-                    print('todo!')
+                    if criterion.arg1.role == 'p':
+                        where_clause += SPARQLTemplates.QUALITY_RELATION.replace('<ATTRIBUTE>', criterion.arg2.name) \
+                            .replace('<PI>', self.variables[criterion.arg1.name])
+            elif criterion.relation.name in ['have', 'has'] and criterion.relation.role == 's':
+                where_clause += self.define_attribute(criterion, simple=False)
             elif criterion.relation.link == 'PROPERTY':
                 where_clause += self.define_attribute(criterion)
             elif criterion.relation.link == 'NOT':
-                print('todo')
+                where_clause += SPARQLTemplates.DEFINE_TYPE_EXCEPT.replace('<PI>', self.variables[criterion.arg1.name])\
+                        .replace('<EX>', self.find_var(criterion.arg2.name))
             elif criterion.relation.role == 'R':  # spatial relationships
                 if len(criterion.extra) == 0:
                     where_clause += self.define_spatial_relationship(criterion)
@@ -225,9 +266,6 @@ class SPARQLGenerator:
                     where_clause += self.define_spatial_relationship(criterion, distance=True)
             elif criterion.relation.role in ['<', '>', '<>', '=', '>=', '<=']:  # comparison
                 where_clause += self.define_comparison(criterion)
-
-        # todo situation
-        # todo define attributes
 
         return where_clause
 
@@ -273,6 +311,50 @@ class SPARQLGenerator:
                     '<SIGN>', sign)
                 comparison += template
                 return comparison
+        else:
+            if dependency.arg2.role in ['n', 'MEASURE']:
+                if dependency.arg1.role == 'o':
+                    template = SPARQLTemplates.ATTRIBUTE_COMPARISON.replace(
+                        '<ATTRIBUTE1>', self.find_var(dependency.arg1.name)).replace(
+                        '?<ATTRIBUTE2>', dependency.arg2.name.split()[0]).replace(
+                        '<SIGN>', dependency.relation.role)
+                    comparison += template
+                    return comparison
+                elif dependency.arg1.role == 'p':
+                    criteria = self.dependencies['criteria']
+                    for c in criteria:
+                        if c.arg1.name == dependency.arg1.name and c.arg2.role in ['p','P']:
+                            self.group_by = SPARQLTemplates.GROUP_BY_HAVING.replace('<PI1>',
+                                                                                    self.find_var(c.arg2.name))
+                            self.group_by = self.group_by.replace('<PI2>', self.find_var(dependency.arg1.name))
+                            self.group_by = self.group_by.replace('<COUNT>', dependency.arg2.name.split()[0])
+                            break
+                        elif c.relation.link == 'prep' and c.relation.role == 'R':
+                            if c.arg2.name == dependency.arg1.name:
+                                self.group_by = SPARQLTemplates.GROUP_BY_HAVING.replace('<PI1>',
+                                                                                    self.find_var(c.arg1.name))
+                                self.group_by = self.group_by.replace('<PI2>', self.find_var(dependency.arg1.name))
+                                self.group_by = self.group_by.replace('<COUNT>', dependency.arg2.name.split()[0])
+                                break
+                            elif c.arg1.name == dependency.arg1.name:
+                                self.group_by = SPARQLTemplates.GROUP_BY_HAVING.replace('<PI1>',
+                                                                                        self.find_var(c.arg2.name))
+                                self.group_by = self.group_by.replace('<PI2>', self.find_var(dependency.arg1.name))
+                                self.group_by = self.group_by.replace('<COUNT>', dependency.arg2.name.split()[0])
+                                break
+                elif dependency.arg1.role in ['s', 'R']:
+                    criteria = self.dependencies['criteria']
+                    for c in criteria:
+                        if c.relation.name == dependency.arg1.name:
+                            self.group_by = SPARQLTemplates.GROUP_BY_HAVING
+                            if c.arg1.role == 'p' or c.arg2.role != 'p':
+                                self.group_by = self.group_by.replace('<PI1>', self.find_var(c.arg1.name))
+                                self.group_by = self.group_by.replace('<PI2>', self.find_var(c.arg2.name))
+                            else:
+                                self.group_by = self.group_by.replace('<PI1>', self.find_var(c.arg2.name))
+                                self.group_by = self.group_by.replace('<PI2>', self.find_var(c.arg1.name))
+                            self.group_by = self.group_by.replace('<COUNT>', dependency.arg2.name.split()[0])
+
         return comparison
 
 
