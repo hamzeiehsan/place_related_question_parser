@@ -250,8 +250,8 @@ countries = load_word(fcountries)
 Embedding.set_stative_active_words(stav, actv)
 
 logging.info('reading dataset...')
-# questions = load_dataset('data/datasets/GeoQuestion201.csv')
-questions = load_dummy_dataset()  # if you want to just test! check the function...
+questions = load_dataset('data/datasets/GeoQuestion201.csv')
+# questions = load_dummy_dataset()  # if you want to just test! check the function...
 
 
 def append_to_file(string):
@@ -358,7 +358,7 @@ def analyze(questions):
         generator = SPARQLGenerator(fol.dependencies, fol.variables)
         print(generator.to_SPARQL())
         console += generator.to_SPARQL() + '\n\n\n'
-        append_to_file(console)
+        # append_to_file(console)
 
 
 analyze(questions)
