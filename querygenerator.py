@@ -359,7 +359,7 @@ class SPARQLGenerator:
 
 
 class AdjectiveResolver:
-    TYPE = ['elevation', 'distance', 'length', 'area', 'age', 'type']
+    TYPE = ['elevation', 'distance', 'length', 'area', 'age', 'type', 'population']
 
     def __init__(self, adjective, superlative=True):
         self.adjective = adjective
@@ -380,11 +380,13 @@ class AdjectiveResolver:
         elif 'oldest' in self.adjective or 'newest' in self.adjective or \
                 'older' in self.adjective or 'newer' in self.adjective:
             return AdjectiveResolver.TYPE[4]
+        elif 'populated' in self.adjective:
+            return AdjectiveResolver.TYPE[6]
         return AdjectiveResolver.TYPE[5]
 
     def asc_or_desc(self):
         if 'close' in self.adjective or 'near' in self.adjective or 'small' in self.adjective or \
-                'new' in self.adjective or 'low' in self.adjective:
+                'new' in self.adjective or 'low' in self.adjective or 'least' in self.adjective:
             return 'asc'
         return 'desc'
 

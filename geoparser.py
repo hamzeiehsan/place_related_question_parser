@@ -2,7 +2,7 @@ from ner import NER, CPARSER, Embedding, DPARSER
 from placequestionparsetree import FOLGenerator
 from querygenerator import SPARQLGenerator
 import re
-
+import json
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -50,14 +50,13 @@ def load_dataset(path):
 
 def load_dummy_dataset():
     questions = []
-    questions.extend(["Are the cities that River Thames crosses more than 10?",
-                      "Which mountains in Scotland have height more than 1000 meters?",
-                      "Which villages in Scotland have a population of less than 500 people?",
-                      "Which city is southeast of Salford?",
+    questions.extend(["Is county Oxfordshire east of the county Essex?",
+                      "Is the Castle of Edinburgh less than 2 km away from Calton Hill?",
+                      "Does England have more counties than Ireland?",
+                      "Which site of Manchester is the most popular?",
                       "In which city is Big Ben located?",
-                      "Which rivers in Scotland have more than 100 km length?",
-                      "Which provinces of Ireland have population over 2000000?",
-                      "Which cities in England have at least 2 castles?"])
+                      "Is there mountain in the county of Greater Manchester taller than 1300 meters above sea level?",
+                      "What is the most populated city in the United Kingdom except London?"])
 
     return questions
 
@@ -217,6 +216,36 @@ def refine_questions(question, toponyms, types):
     return question
 
 
+def write_labels():
+    with open('evaluation/eval.json', "w", encoding='utf-8') as jsonfile:
+        json.dump(eval, jsonfile, ensure_ascii=False)
+
+
+def read_labels():
+    with open('evaluation/eval.json', encoding='utf-8') as jsonfile:
+        data = json.load(jsonfile)
+    return data
+
+
+def append_to_file(string):
+    with open('console.txt', 'a') as redf:
+        redf.write(string)
+
+
+def clean_file():
+    with open('console.txt', 'w') as redf:
+        redf.write("")
+
+
+def ask_eval_input(key):
+    res = {}
+    f = lambda x: '' if x is None else x
+    res['TP'] = f(input('how many {} are correctly detected?'.format(key)))
+    res['FP'] = f(input('how many {} are incorrectly detected?'.format(key)))
+    res['FN'] = f(input('how many {} are missing?'.format(key)))
+    return res
+
+
 PRONOUN = dict(
     {'Where': '1', 'What': '2', 'Which': '3', 'When': '4', 'How': '5', 'Why': '7', 'Does': '8',
      'Is': '8', 'Are': '8', 'Do': '8'})
@@ -249,26 +278,30 @@ countries = load_word(fcountries)
 
 Embedding.set_stative_active_words(stav, actv)
 
+is_console = False
+is_test = False
+is_eval = True
+
+logging.info('running parameters: test: {0}, console: {1}, eval: {2}'.format(str(is_test), str(is_console),
+                                                                             str(is_eval)))
 logging.info('reading dataset...')
-questions = load_dataset('data/datasets/GeoQuestion201.csv')
+if not is_test:
+    questions = load_dataset('data/datasets/GeoQuestion201.csv')
+else:
+    questions = load_dummy_dataset()  # if you want to just test! check the function...
 
-
-# questions = load_dummy_dataset()  # if you want to just test! check the function...
-
-
-def append_to_file(string):
-    with open('console.txt', 'a') as redf:
-        redf.write(string)
-
-
-def clean_file():
-    with open('console.txt', 'w') as redf:
-        redf.write("")
+if is_eval:
+    eval = read_labels()  # question: encoding: {elem: {TP: , FP:, FN: }},
+    #                                 fol: {elem: {TP: , FP:, FN: }},
+    #                                 geosparql: {elem: {TP: , FP:, FN: }}
+    eval_fol = ['Declaration', 'Intent', 'SRelation', 'Situation', 'Comparison', 'Quality', 'Conjunction']
+    eval_geosparql = ['Overall', 'Intent', 'Where', 'OrderBy', 'GroupBy']
 
 
 def analyze(questions):
     clean_file()
     for question in questions:
+        original_question = question
         console = '*********************************************\n'
         # extract NER using fine-grained NER model
         result = extract_information(question, pt_set, et_set)
@@ -358,9 +391,47 @@ def analyze(questions):
 
         # generate GeoSPARQL queries from FOL statements (deps)
         generator = SPARQLGenerator(fol.dependencies, fol.variables)
-        print(generator.to_SPARQL())
-        console += generator.to_SPARQL() + '\n\n\n'
-        # append_to_file(console)
+        geosparql = generator.to_SPARQL()
+        print(geosparql)
+        console += geosparql + '\n\n\n'
+        if is_console:
+            append_to_file(console)
+
+        if is_eval and question not in eval.keys():
+            eval[question] = {'encoding': {}, 'fol': {}, 'geosparql': {}}
+            print(question)
+            encodings = tree.all_encodings()
+            for key, encoding in encodings.items():
+                print('evaluate: {}'.format(key))
+                print('val: {}'.format(encoding))
+                res_eval = ask_eval_input(key)
+                eval[question]['encoding'][key] = res_eval
+            missing = input('is an encoding missing? (Y/N)')
+            while missing == 'Y':
+                key = input('what class is missing?')
+                eval[question]['encoding'][key] = {}
+                eval[question]['encoding'][key]['TP'] = 0
+                eval[question]['encoding'][key]['FP'] = 0
+                f = lambda x: '' if x is None else x
+                eval[question]['encoding'][key]['FN'] = f(input('how many {} is missing?'.format(key)))
+                missing = input('is an encoding missing? (Y/N)')
+
+            print(log_string)
+            for key in eval_fol:
+                print('evaluate based on: {}'.format(key))
+                res_eval = ask_eval_input(key)
+                eval[question]['fol'][key] = res_eval
+            print(geosparql)
+            for key in eval_geosparql:
+                print('evaluate based on: {}'.format(key))
+                res_eval = ask_eval_input(key)
+                eval[question]['geosparql'][key] = res_eval
+            write = input('Do you want to write into file? (Y/N)')
+            if questions.index(original_question) % 20 == 0 or write == 'Y':
+                write_labels()
+                print('Congrats, you finished evaluating {0} questions, remaining {1}'
+                      .format(questions.index(original_question),
+                              len(questions) - questions.index(original_question) - 1))
 
 
 analyze(questions)

@@ -150,6 +150,17 @@ class PlaceQuestionParseTree:
                     named_object.parent.role = 'LOCATION'
         return res_relationships
 
+    def all_encodings(self):
+        res = {}
+        roles = search.findall(self.root, filter_=lambda node: node.role != '')
+        for role in roles:
+            key = role.role
+            val = role.name
+            if key not in res.keys():
+                res[key] = []
+            res[key].append(val)
+        return res
+
     def label_complex_spatial_relationships(self, prep, pattern):
         matched = False
         context = prep.parent
@@ -1283,7 +1294,11 @@ class FOLGenerator:
                     measures = search.findall(relationship, filter_=lambda node: node.role == 'MEASURE')
                     if len(measures) == 1:
                         measure = measures[0]
+                        additional = search.findall(measure, filter_=lambda node: node.role not in ['o', 'n'] and
+                                                                                  node != measure)
                         extra = PlaceDependencyTree.clone_node_without_children(measure, cons_tree=True)
+                        for a in additional:
+                            extra.name = extra.name.replace(a.name, '').strip()
                         self.dependencies['criteria'][len(self.dependencies['criteria']) - 1].extra.append(extra)
 
     def extract_property_relationships(self):
