@@ -409,11 +409,12 @@ def analyze(questions):
             missing = input('is an encoding missing? (Y/N)')
             while missing == 'Y':
                 key = input('what class is missing?')
-                eval[question]['encoding'][key] = {}
-                eval[question]['encoding'][key]['TP'] = 0
-                eval[question]['encoding'][key]['FP'] = 0
-                f = lambda x: '' if x is None else x
-                eval[question]['encoding'][key]['FN'] = f(input('how many {} is missing?'.format(key)))
+                if key != "":
+                    eval[question]['encoding'][key] = {}
+                    eval[question]['encoding'][key]['TP'] = 0
+                    eval[question]['encoding'][key]['FP'] = 0
+                    f = lambda x: '' if x is None else x
+                    eval[question]['encoding'][key]['FN'] = f(input('how many {} is missing?'.format(key)))
                 missing = input('is an encoding missing? (Y/N)')
 
             print(log_string)
