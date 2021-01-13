@@ -87,7 +87,7 @@ def find_types(question, excluded, types, specifics=[]):
                 elif specific + ' ' + type in whole_question:
                     captured.append(specific + ' ' + type)
                 elif not type.endswith(
-                        "s") and 'the ' + type + ' of ' + specific in whole_question:  # not plural and have the pattern the type of P
+                        "s") and 'the ' + type + ' of ' + specific in whole_question:
                     captured.append('the ' + type + ' of ' + specific)
     captured = sorted(captured, key=len, reverse=True)
     return captured
@@ -278,18 +278,20 @@ countries = load_word(fcountries)
 
 Embedding.set_stative_active_words(stav, actv)
 
-is_console = False
-is_test = False
-is_eval = True
+is_console = False  # WRITE THE CONSOLE INTO FILE IF TRUE
+is_test = False  # IF TRUE: ONLY READ DUMMY QUESTIONS AND RUN THE PROGRAM
+is_eval = True  # IF TURE: RUN EVALUATION PER QUESTION, ALSO WRITE THE RESULTS IN EVAL.JSON
 
 logging.info('running parameters: test: {0}, console: {1}, eval: {2}'.format(str(is_test), str(is_console),
                                                                              str(is_eval)))
 logging.info('reading dataset...')
 if not is_test:
     questions = load_dataset('data/datasets/GeoQuestion201.csv')
+    questions = questions[:101]
 else:
     questions = load_dummy_dataset()  # if you want to just test! check the function...
 
+eval = {}
 if is_eval:
     eval = read_labels()  # question: encoding: {elem: {TP: , FP:, FN: }},
     #                                 fol: {elem: {TP: , FP:, FN: }},
@@ -433,6 +435,103 @@ def analyze(questions):
                 print('Congrats, you finished evaluating {0} questions, remaining {1}'
                       .format(questions.index(original_question),
                               len(questions) - questions.index(original_question) - 1))
+    write_labels()
 
 
 analyze(questions)
+
+
+def add_measures(dict_question, dict_all):
+    TP = to_int(dict_question['TP'])
+    FP = to_int(dict_question['FP'])
+    FN = to_int(dict_question['FN'])
+    PR = 0
+    RC = 0
+    dict_all['TP'] += TP
+    dict_all['FP'] += FP
+    dict_all['FN'] += FN
+    dict_all['COUNT'] += 1
+    if TP + FP > 0:
+        PR = TP / (TP + FP)
+        dict_all['PR'] += PR
+        dict_all['COUNT_PR'] += 1
+
+    if TP + FN > 0:
+        RC = TP / (TP + FN)
+        dict_all['RC'] += RC
+        dict_all['COUNT_RC'] += 1
+
+    if PR != 0 and RC != 0:
+        dict_all['FS'] += 2*PR*RC/(PR+RC)
+    return dict_all
+
+
+KEY_MAPPING = {'1':'Q-Word','2':'Q-Word','3':'Q-Word','4':'Q-Word','5':'Q-Word','6':'Q-Word','7':'Q-Word','8':'Q-Word',
+               '<':'<>', '<=':'<>', '>':'<>', '>=':'<>'}
+
+
+def add_question_measures(eval_question, dict_all, mapping=False):
+    for key, val_dict in eval_question.items():
+        key2 = key
+        if mapping and key in KEY_MAPPING.keys():
+            key2 = KEY_MAPPING[key]
+        if key2 not in dict_all.keys():
+            dict_all[key2] = {'TP': 0, 'FP': 0, 'FN': 0, 'COUNT': 0,
+                             'PR': 0, 'COUNT_PR': 0, 'RC': 0, 'COUNT_RC': 0, 'FS': 0}
+        dict_all[key2] = add_measures(val_dict, dict_all[key2])
+    return dict_all
+
+
+def calculate_mic_mac_measures(dict_all, only_precision=False):
+    new_dict = {}
+    if not only_precision:
+        print('KEY\t\t\tMAC_PR\t\tMAC_RC\t\tMAC_FS\t\t\tMIC_PR\t\tMIC_RC\t\tMIC_FS')
+    else:
+        print('KEY\t\t\tMAC_PR\t\t\tMIC_PR')
+    for key, val_dict in dict_all.items():
+        new_dict[key] = {}
+        new_dict[key]['MAC_PR'] = val_dict['PR'] / val_dict['COUNT_PR'] * 100
+        if not only_precision:
+            new_dict[key]['MAC_RC'] = val_dict['RC'] / val_dict['COUNT_RC'] * 100
+            new_dict[key]['MAC_FS'] = val_dict['FS'] / val_dict['COUNT_RC']
+        new_dict[key]['MIC_PR'] = val_dict['TP'] / (val_dict['TP'] + val_dict['FP']) * 100
+        if not only_precision:
+            new_dict[key]['MIC_RC'] = val_dict['TP'] / (val_dict['TP'] + val_dict['FN']) * 100
+            new_dict[key]['MIC_FS'] = 2*new_dict[key]['MIC_RC']*new_dict[key]['MIC_PR']/\
+                                      (new_dict[key]['MIC_RC']+new_dict[key]['MIC_PR'])
+            print('{0: >12}\t{1:2.2f}\t\t{2:2.2f}\t\t{3:2.2f}\t\t\t{4:2.2f}\t\t{5:2.2f}\t\t{6:2.2f}'.
+                  format(key, new_dict[key]['MAC_PR'], new_dict[key]['MAC_RC'], new_dict[key]['MAC_FS'],
+                         new_dict[key]['MIC_PR'], new_dict[key]['MIC_RC'], new_dict[key]['MIC_FS']))
+        else:
+            print('{0: >12}\t{1:2.2f}\t\t\t{2:2.2f}'.
+                  format(key, new_dict[key]['MAC_PR'], new_dict[key]['MIC_PR']))
+    print('---------------------------------------------------------------------------------------------------------\n')
+    return new_dict
+
+
+def to_int(string):
+    if isinstance(string, int):
+        return string
+    if string.strip() == '':
+        return 0
+    return int(string)
+
+
+if is_eval:
+    logging.info('reading manually investigated results to derive evaluation measure...')
+    encoding_evaluation = {}
+    fol_evaluation = {}
+    geosparql_evaluation = {}
+    for question in eval.keys():
+        # encoding precision, recall and f-score...
+        encoding_evaluation = add_question_measures(eval[question]['encoding'], encoding_evaluation, mapping=True)
+
+        # encoding precision, recall and f-score: for intent only accuracy
+        fol_evaluation = add_question_measures(eval[question]['fol'], fol_evaluation)
+
+        # accuracy for overall, intent, where, order by, group by
+        geosparql_evaluation = add_question_measures(eval[question]['geosparql'], geosparql_evaluation)
+
+    encodings_results = calculate_mic_mac_measures(encoding_evaluation)
+    fol_results = calculate_mic_mac_measures(fol_evaluation)
+    geosparql_results = calculate_mic_mac_measures(geosparql_evaluation, only_precision=True)
