@@ -287,9 +287,9 @@ logging.info('running parameters: test: {0}, console: {1}, eval: {2}'.format(str
 logging.info('reading dataset...')
 if not is_test:
     questions = load_dataset('data/datasets/GeoQuestion201.csv')
-    questions = questions[:101]
+    questions = questions
 else:
-    questions = load_dummy_dataset()  # if you want to just test! check the function...
+    questions = load_dummy_dataset()  # if you want to just test to check the function...
 
 eval = {}
 if is_eval:
@@ -517,7 +517,7 @@ def to_int(string):
     return int(string)
 
 
-if is_eval:
+if is_eval or len(eval) > 0:
     logging.info('reading manually investigated results to derive evaluation measure...')
     encoding_evaluation = {}
     fol_evaluation = {}
