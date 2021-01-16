@@ -287,7 +287,6 @@ logging.info('running parameters: test: {0}, console: {1}, eval: {2}'.format(str
 logging.info('reading dataset...')
 if not is_test:
     questions = load_dataset('data/datasets/GeoQuestion201.csv')
-    questions = questions
 else:
     questions = load_dummy_dataset()  # if you want to just test to check the function...
 

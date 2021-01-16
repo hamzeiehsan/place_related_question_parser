@@ -1098,7 +1098,7 @@ class FOLGenerator:
                             first = PlaceDependencyTree.clone_node_without_children(generics[0])
                             second = PlaceDependencyTree.clone_node_without_children(objects[0])
                             relation = PlaceDependencyTree.clone_node_without_children(situation)
-            elif situation.name in ['border', 'borders', 'cross', 'crosses', 'flow', 'flows']:
+            elif situation.name in ['border', 'borders', 'cross', 'crosses', 'flow', 'flows', 'discharge', 'discharges']:
                 relation = AnyNode(name=situation.name, spans=[{}], attributes=None, link='prep', role='R',
                                    nodeType='dep')
                 generic_places = search.findall(self.dep.root, filter_=lambda node: node.role == 'p')

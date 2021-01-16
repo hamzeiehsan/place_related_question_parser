@@ -59,6 +59,7 @@ class SPARQLTemplates:
 
     SPATIAL_RELATION_MAPPING = {'in': '\t<PI1>GEOM geosparql:ehCoveredBy <PI2>GEOM.\n',
                                 'of': '\t<PI1>GEOM geosparql:ehCoveredBy <PI2>GEOM.\n',
+                                'part of': '\t<PI1>GEOM geosparql:ehCoveredBy <PI2>GEOM.\n',
                                 'near': '\tFILTER (geof:distance(<PI1>GEOM, <PI2>GEOM, units:metre) < 5000).\n',
                                 'close to': '\tFILTER (geof:distance(<PI1>GEOM, <PI2>GEOM, units:metre) < 5000).\n',
                                 'north of': '\tFILTER (spatialF:northGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
@@ -75,6 +76,8 @@ class SPARQLTemplates:
                                                 '\tFILTER (spatialF:westGeom(<PI1>GEOM, <PI2>GEOM, 10)).\n',
                                 'border': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'borders': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'discharge': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
+                                'discharges': '\tFILTER(geof:sfTouches(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'cross': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'crosses': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
                                 'flow': '\tFILTER(geof:sfCrosses(<PI1>GEOM,<PI2>GEOM)).\n',
