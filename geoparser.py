@@ -484,7 +484,7 @@ def add_question_measures(eval_question, dict_all, mapping=False):
 def calculate_mic_mac_measures(dict_all, only_precision=False):
     new_dict = {}
     if not only_precision:
-        print('KEY\t\t\tMAC_PR\t\tMAC_RC\t\tMAC_FS\t\t\tMIC_PR\t\tMIC_RC\t\tMIC_FS')
+        print('KEY\t\t\tMAC_PR\t\tMAC_RC\t\tMAC_FS\t\t\tMIC_PR\t\tMIC_RC\t\tMIC_FS\t\tCOUNT')
     else:
         print('KEY\t\t\tMAC_PR\t\t\tMIC_PR')
     for key, val_dict in dict_all.items():
@@ -498,11 +498,12 @@ def calculate_mic_mac_measures(dict_all, only_precision=False):
             new_dict[key]['MIC_RC'] = val_dict['TP'] / (val_dict['TP'] + val_dict['FN']) * 100
             new_dict[key]['MIC_FS'] = 2*new_dict[key]['MIC_RC']*new_dict[key]['MIC_PR']/\
                                       (new_dict[key]['MIC_RC']+new_dict[key]['MIC_PR'])
-            print('{0: >12}\t{1:2.2f}\t\t{2:2.2f}\t\t{3:2.2f}\t\t\t{4:2.2f}\t\t{5:2.2f}\t\t{6:2.2f}'.
+            print('{0: >12}\t{1:2.2f}\t\t{2:2.2f}\t\t{3:2.2f}\t\t\t{4:2.2f}\t\t{5:2.2f}\t\t{6:2.2f}\t\t{7}'.
                   format(key, new_dict[key]['MAC_PR'], new_dict[key]['MAC_RC'], new_dict[key]['MAC_FS'],
-                         new_dict[key]['MIC_PR'], new_dict[key]['MIC_RC'], new_dict[key]['MIC_FS']))
+                         new_dict[key]['MIC_PR'], new_dict[key]['MIC_RC'], new_dict[key]['MIC_FS'],
+                         val_dict['TP'] + val_dict['FN']))
         else:
-            print('{0: >12}\t{1:2.2f}\t\t\t{2:2.2f}'.
+            print('{0: >12}\t{1:2.2f}\t\t\t{2:2.2f}\t\t\t{3}'.
                   format(key, new_dict[key]['MAC_PR'], new_dict[key]['MIC_PR']))
     print('---------------------------------------------------------------------------------------------------------\n')
     return new_dict
