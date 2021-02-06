@@ -459,9 +459,6 @@ def add_measures(dict_question, dict_all):
         RC = TP / (TP + FN)
         dict_all['RC'] += RC
         dict_all['COUNT_RC'] += 1
-
-    if PR != 0 and RC != 0:
-        dict_all['FS'] += 2*PR*RC/(PR+RC)
     return dict_all
 
 
@@ -476,7 +473,7 @@ def add_question_measures(eval_question, dict_all, mapping=False):
             key2 = KEY_MAPPING[key]
         if key2 not in dict_all.keys():
             dict_all[key2] = {'TP': 0, 'FP': 0, 'FN': 0, 'COUNT': 0,
-                             'PR': 0, 'COUNT_PR': 0, 'RC': 0, 'COUNT_RC': 0, 'FS': 0}
+                             'PR': 0, 'COUNT_PR': 0, 'RC': 0, 'COUNT_RC': 0}
         dict_all[key2] = add_measures(val_dict, dict_all[key2])
     return dict_all
 
@@ -492,18 +489,19 @@ def calculate_mic_mac_measures(dict_all, only_precision=False):
         new_dict[key]['MAC_PR'] = val_dict['PR'] / val_dict['COUNT_PR'] * 100
         if not only_precision:
             new_dict[key]['MAC_RC'] = val_dict['RC'] / val_dict['COUNT_RC'] * 100
-            new_dict[key]['MAC_FS'] = val_dict['FS'] / val_dict['COUNT_RC']
+            new_dict[key]['MAC_FS'] = 2*new_dict[key]['MAC_RC']*new_dict[key]['MAC_PR']/\
+                                      (new_dict[key]['MAC_RC']+new_dict[key]['MAC_PR'])
         new_dict[key]['MIC_PR'] = val_dict['TP'] / (val_dict['TP'] + val_dict['FP']) * 100
         if not only_precision:
             new_dict[key]['MIC_RC'] = val_dict['TP'] / (val_dict['TP'] + val_dict['FN']) * 100
             new_dict[key]['MIC_FS'] = 2*new_dict[key]['MIC_RC']*new_dict[key]['MIC_PR']/\
                                       (new_dict[key]['MIC_RC']+new_dict[key]['MIC_PR'])
-            print('{0: >12}\t{1:2.2f}\t\t{2:2.2f}\t\t{3:2.2f}\t\t\t{4:2.2f}\t\t{5:2.2f}\t\t{6:2.2f}\t\t{7}'.
+            print('{0: >12}\t{1:2.1f}\t\t{2:2.1f}\t\t{3:2.1f}\t\t\t{4:2.1f}\t\t{5:2.1f}\t\t{6:2.1f}\t\t{7}'.
                   format(key, new_dict[key]['MAC_PR'], new_dict[key]['MAC_RC'], new_dict[key]['MAC_FS'],
                          new_dict[key]['MIC_PR'], new_dict[key]['MIC_RC'], new_dict[key]['MIC_FS'],
                          val_dict['TP'] + val_dict['FN']))
         else:
-            print('{0: >12}\t{1:2.2f}\t\t\t{2:2.2f}\t\t\t{3}'.
+            print('{0: >12}\t{1:2.1f}\t\t\t{2:2.1f}\t\t\t{3}'.
                   format(key, new_dict[key]['MAC_PR'], new_dict[key]['MIC_PR']))
     print('---------------------------------------------------------------------------------------------------------\n')
     return new_dict
@@ -534,4 +532,4 @@ if is_eval or len(eval) > 0:
 
     encodings_results = calculate_mic_mac_measures(encoding_evaluation)
     fol_results = calculate_mic_mac_measures(fol_evaluation)
-    geosparql_results = calculate_mic_mac_measures(geosparql_evaluation, only_precision=True)
+    geosparql_results = calculate_mic_mac_measures(geosparql_evaluation)
